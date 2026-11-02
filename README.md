@@ -1,6 +1,6 @@
 # Reasonbook
 
-**Fraud prevention framework for federal and state grants.**
+**Fraud prevention application for federal and state grants.**
 
 Reasonbook captures the full lifecycle of grant and entitlement funding decisions
 as a tamper-evident, auditable record. Risk signals become alerts, alerts become
