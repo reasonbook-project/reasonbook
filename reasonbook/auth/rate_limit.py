@@ -3,8 +3,8 @@
 """Login/signup rate limiting — disabled in v1.0.
 
 v1.0 ships **no login rate limiting** (see README, Known limitations).
-with its external dependency; reintroducing it (DB-backed or via the
-roadmap scale profile) is tracked for a future release.
+Reintroducing it (DB-backed, or via the roadmap scale profile) is tracked
+for a future release.
 
 ``check_rate_limit`` always allows, keeping the call sites in
 ``api/auth.py`` working. Account **lockout** (consecutive-failure based)
