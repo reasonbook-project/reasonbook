@@ -42,6 +42,13 @@ Death Master File), and IRS/Census/CMS feeds are **on the roadmap** — the
 risk-signal vocabulary and the program/archetype config for them are present, but
 no live clients for those sources are included in v1.0.
 
+> The CSVs bundled in [`data/`](data/) are a **point-in-time snapshot** of public
+> USAspending data, included so the app has a working catalog out of the box.
+> **Refresh them with current data before relying on the catalog:** download new
+> exports from [USAspending.gov](https://www.usaspending.gov/), keep the same
+> filenames in `data/`, and re-run `python -m scripts.import_usaspending --all`
+> (the importer is idempotent). See [`data/README.md`](data/README.md).
+
 ---
 
 ## Quick start
