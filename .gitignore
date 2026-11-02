@@ -46,8 +46,10 @@ reasonbook/static/web/
 secrets/
 *-credentials.txt
 
-# Local data / SQLite
-/data/
+# Local data / SQLite. NOTE: the seed CSVs in data/ ARE committed (the
+# Dockerfile copies them). Only ignore runtime state, not the whole dir.
+/data/attachments/
+data/*.db*
 *.db
 *.db-wal
 *.db-shm
