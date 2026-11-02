@@ -57,8 +57,8 @@ def test_downgrade_base_drops_all_tables(clean_db: Engine) -> None:
     # Truncate decision_types first — the 0012 → 0011 downgrade re-narrows the
     # priority CHECK constraint and any 'critical' rows would block it.
     with clean_db.begin() as conn:
-        conn.execute(text(f"TRUNCATE {schema_prefix()}decision_types CASCADE"))
-        conn.execute(text(f"TRUNCATE {schema_prefix()}decisions CASCADE"))
+        conn.execute(text(f"DELETE FROM {schema_prefix()}decision_types CASCADE"))
+        conn.execute(text(f"DELETE FROM {schema_prefix()}decisions CASCADE"))
 
     cfg = _alembic_config()
     command.downgrade(cfg, "base")

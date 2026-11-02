@@ -28,7 +28,7 @@ def auth_cookie(client: FlaskClient) -> str:
     )
     assert resp.status_code == 200, resp.get_json()
     cookie = resp.headers.get("Set-Cookie", "")
-    assert "dp_session" in cookie
+    assert "reasonbook_session" in cookie
     return cookie
 
 

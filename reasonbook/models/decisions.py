@@ -14,6 +14,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -213,6 +214,9 @@ class DecisionAttachment(Base):
     """
 
     __tablename__ = "decision_attachments"
+    __table_args__ = (
+        Index("idx_decision_attachments_decision_stage", "decision_id", "stage"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     decision_id: Mapped[uuid.UUID] = mapped_column(

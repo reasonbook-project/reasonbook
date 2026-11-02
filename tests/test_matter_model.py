@@ -13,6 +13,8 @@ Covers migration 0039 (TENANCY-MODEL.md §10 step 1):
 
 from __future__ import annotations
 
+from sqlalchemy.exc import IntegrityError
+
 from reasonbook.db import schema_prefix
 from reasonbook.config import get_settings
 
@@ -47,7 +49,15 @@ def test_decisions_have_matter_columns(clean_db: Engine) -> None:
 
 
 def test_fund_flow_path_has_gin_index(clean_db: Engine) -> None:
-    """apply_tier_scope (step 3) relies on GIN-indexed ANY() lookups."""
+    """apply_tier_scope (step 3) relies on GIN-indexed ANY() lookups.
+
+    PostgreSQL-only: fund_flow_path is a JSON column (no GIN index) on
+    SQLite, and pg_indexes is a PostgreSQL catalog.
+    """
+    import pytest
+
+    if not get_settings().is_postgres:
+        pytest.skip("GIN index / pg_indexes is PostgreSQL-only")
     with clean_db.connect() as conn:
         row = conn.execute(
             text(
@@ -84,7 +94,7 @@ def test_user_tier_check_federal_must_be_null_org(clean_db: Engine) -> None:
                 ),
                 {"org": state_org_id},
             )
-    except psycopg.errors.CheckViolation:
+    except IntegrityError:
         raised = True
     except Exception:
         raised = True
@@ -110,7 +120,7 @@ def test_user_tier_check_state_must_have_org(clean_db: Engine) -> None:
                     "'bad-state@example.com', 'x', 'Bad State', 'member', 'state')"
                 )
             )
-    except psycopg.errors.CheckViolation:
+    except IntegrityError:
         raised = True
     except Exception:
         raised = True
@@ -132,11 +142,11 @@ def test_matter_node_federal_root_invariant(clean_db: Engine) -> None:
                     "(id, matter_id, parent_node_id, tier, participant_org_id, "
                     " active_archetypes, authority_role, added_by_user_id) "
                     "VALUES (gen_random_uuid(), :matter, NULL, 'federal', :org, "
-                    "ARRAY['competitive_award']::text[], 'awarding_official', :user)"
+                    "'[\"competitive_award\"]', 'awarding_official', :user)"
                 ),
                 {"matter": matter_id, "org": state_org_id, "user": federal_user_id},
             )
-    except psycopg.errors.CheckViolation:
+    except IntegrityError:
         raised = True
     except Exception:
         raised = True
@@ -156,11 +166,11 @@ def test_matter_node_state_must_have_parent_and_org(clean_db: Engine) -> None:
                     "(id, matter_id, parent_node_id, tier, participant_org_id, "
                     " active_archetypes, authority_role, added_by_user_id) "
                     "VALUES (gen_random_uuid(), :matter, gen_random_uuid(), "
-                    "'state', NULL, ARRAY[]::text[], 'state_program_director', :user)"
+                    "'state', NULL, '[]', 'state_program_director', :user)"
                 ),
                 {"matter": matter_id, "user": federal_user_id},
             )
-    except psycopg.errors.CheckViolation:
+    except IntegrityError:
         raised = True
     except Exception:
         raised = True
@@ -181,7 +191,7 @@ def test_matter_node_unique_active_per_participant(clean_db: Engine) -> None:
                 "(id, matter_id, parent_node_id, tier, participant_org_id, "
                 " active_archetypes, authority_role, added_by_user_id) "
                 "VALUES (:id, :matter, NULL, 'federal', NULL, "
-                "ARRAY['competitive_award']::text[], 'awarding_official', :user)"
+                "'[\"competitive_award\"]', 'awarding_official', :user)"
             ),
             {"id": federal_root_id, "matter": matter_id, "user": federal_user_id},
         )
@@ -191,7 +201,7 @@ def test_matter_node_unique_active_per_participant(clean_db: Engine) -> None:
                 "(id, matter_id, parent_node_id, tier, participant_org_id, "
                 " active_archetypes, authority_role, added_by_user_id) "
                 "VALUES (gen_random_uuid(), :matter, :parent, 'state', :org, "
-                "ARRAY['formula_allocation']::text[], "
+                "'[\"formula_allocation\"]', "
                 "'state_program_director', :user)"
             ),
             {
@@ -212,7 +222,7 @@ def test_matter_node_unique_active_per_participant(clean_db: Engine) -> None:
                     "(id, matter_id, parent_node_id, tier, participant_org_id, "
                     " active_archetypes, authority_role, added_by_user_id) "
                     "VALUES (gen_random_uuid(), :matter, :parent, 'state', :org, "
-                    "ARRAY['formula_allocation']::text[], "
+                    "'[\"formula_allocation\"]', "
                     "'state_program_director', :user)"
                 ),
                 {
@@ -222,7 +232,7 @@ def test_matter_node_unique_active_per_participant(clean_db: Engine) -> None:
                     "user": federal_user_id,
                 },
             )
-    except psycopg.errors.UniqueViolation:
+    except IntegrityError:
         raised = True
     except Exception:
         raised = True
@@ -245,7 +255,7 @@ def test_matter_node_unique_active_per_participant(clean_db: Engine) -> None:
                 "(id, matter_id, parent_node_id, tier, participant_org_id, "
                 " active_archetypes, authority_role, added_by_user_id) "
                 "VALUES (gen_random_uuid(), :matter, :parent, 'state', :org, "
-                "ARRAY['formula_allocation','modification']::text[], "
+                "'[\"formula_allocation\",\"modification\"]', "
                 "'state_program_director', :user)"
             ),
             {

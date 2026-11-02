@@ -127,6 +127,11 @@ def _sqlite_pragmas(dbapi_connection: object, _record: object) -> None:
     """
     if engine.dialect.name != "sqlite":
         return
+    # Compatibility shim: PostgreSQL's gen_random_uuid() used by some raw SQL.
+    # Return 32-char hex to match how the Uuid type stores UUIDs on SQLite.
+    dbapi_connection.create_function(  # type: ignore[attr-defined]
+        "gen_random_uuid", 0, lambda: uuid.uuid4().hex
+    )
     cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
     try:
         cursor.execute("PRAGMA journal_mode=WAL")

@@ -53,7 +53,7 @@ def test_login_success_sets_httponly_cookie_and_returns_user(
     # not tenant_entitlements.
 
     cookie_header = resp.headers.get("Set-Cookie", "")
-    assert "dp_session=" in cookie_header
+    assert "reasonbook_session=" in cookie_header
     assert "HttpOnly" in cookie_header
     assert "SameSite=Lax" in cookie_header
 
@@ -64,7 +64,7 @@ def test_login_rejects_bad_password(client: FlaskClient) -> None:
         json={"username": "jamie.kim", "password": "wrong"},
     )
     assert resp.status_code == 401
-    assert "Set-Cookie" not in resp.headers or "dp_session=" not in resp.headers.get(
+    assert "Set-Cookie" not in resp.headers or "reasonbook_session=" not in resp.headers.get(
         "Set-Cookie", ""
     )
 

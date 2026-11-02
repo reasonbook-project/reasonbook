@@ -13,7 +13,19 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String, Text, func, text
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from reasonbook.db import GUID, Base
@@ -107,6 +119,24 @@ class MatterNode(Base):
     """
 
     __tablename__ = "matter_nodes"
+    __table_args__ = (
+        # Federal root has NULL participant_org_id; all other tiers set it.
+        CheckConstraint(
+            "(tier = 'federal' AND participant_org_id IS NULL) OR "
+            "(tier <> 'federal' AND participant_org_id IS NOT NULL)",
+            name="chk_matter_nodes_tier_org",
+        ),
+        # At most one ACTIVE node per (matter, org) — partial unique index on
+        # the not-yet-removed rows. Works on both dialects.
+        Index(
+            "uq_matter_nodes_active_org",
+            "matter_id",
+            "participant_org_id",
+            unique=True,
+            sqlite_where=text("removed_at IS NULL"),
+            postgresql_where=text("removed_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     matter_id: Mapped[uuid.UUID] = mapped_column(

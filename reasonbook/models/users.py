@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func, text
+from sqlalchemy import CheckConstraint, JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from reasonbook.db import GUID, Base
@@ -16,6 +16,14 @@ from reasonbook.db import GUID, Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        # Federal-tier users have NULL participant_org_id; state/recipient set it.
+        CheckConstraint(
+            "(tier = 'federal' AND participant_org_id IS NULL) OR "
+            "(tier <> 'federal' AND participant_org_id IS NOT NULL)",
+            name="chk_users_tier_org",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(GUID, primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[str] = mapped_column(

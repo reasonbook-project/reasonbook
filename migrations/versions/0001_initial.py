@@ -4,7 +4,7 @@
 
 Revision ID: 0001
 Revises: 
-Create Date: 2026-11-01 17:21:51.550215
+Create Date: 2026-11-01 20:57:25.925232
 """
 
 from __future__ import annotations
@@ -209,6 +209,7 @@ def upgrade() -> None:
     sa.Column('participant_org_id', reasonbook.db.GUID(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.CheckConstraint("(tier = 'federal' AND participant_org_id IS NULL) OR (tier <> 'federal' AND participant_org_id IS NOT NULL)", name='chk_users_tier_org'),
     sa.ForeignKeyConstraint(['agency_id'], ['platform.agencies.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['invited_by'], ['platform.users.id'], ),
     sa.ForeignKeyConstraint(['participant_org_id'], ['platform.participant_orgs.id'], ),
@@ -347,6 +348,7 @@ def upgrade() -> None:
     sa.Column('added_by_user_id', reasonbook.db.GUID(), nullable=False),
     sa.Column('removed_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('amount', sa.Numeric(precision=18, scale=2), nullable=True),
+    sa.CheckConstraint("(tier = 'federal' AND participant_org_id IS NULL) OR (tier <> 'federal' AND participant_org_id IS NOT NULL)", name='chk_matter_nodes_tier_org'),
     sa.ForeignKeyConstraint(['added_by_user_id'], ['platform.users.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['matter_id'], ['platform.matters.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['parent_node_id'], ['platform.matter_nodes.id'], ),
@@ -354,6 +356,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     schema='platform'
     )
+    op.create_index('uq_matter_nodes_active_org', 'matter_nodes', ['matter_id', 'participant_org_id'], unique=True, schema='platform', sqlite_where=sa.text('removed_at IS NULL'), postgresql_where=sa.text('removed_at IS NULL'))
     op.create_table('oversight_findings',
     sa.Column('id', reasonbook.db.GUID(), nullable=False),
     sa.Column('tenant_id', sa.String(length=50), nullable=False),
@@ -513,6 +516,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     schema='platform'
     )
+    op.create_index('idx_decision_attachments_decision_stage', 'decision_attachments', ['decision_id', 'stage'], unique=False, schema='platform')
     op.create_table('decision_events',
     sa.Column('id', reasonbook.db.GUID(), nullable=False),
     sa.Column('decision_id', reasonbook.db.GUID(), nullable=False),
@@ -646,11 +650,13 @@ def downgrade() -> None:
     op.drop_table('disputes', schema='platform')
     op.drop_table('determination_ledger', schema='platform')
     op.drop_table('decision_events', schema='platform')
+    op.drop_index('idx_decision_attachments_decision_stage', table_name='decision_attachments', schema='platform')
     op.drop_table('decision_attachments', schema='platform')
     op.drop_table('control_points', schema='platform')
     op.drop_table('alert_dispositions', schema='platform')
     op.drop_table('decisions', schema='platform')
     op.drop_table('oversight_findings', schema='platform')
+    op.drop_index('uq_matter_nodes_active_org', table_name='matter_nodes', schema='platform', sqlite_where=sa.text('removed_at IS NULL'), postgresql_where=sa.text('removed_at IS NULL'))
     op.drop_table('matter_nodes', schema='platform')
     op.drop_table('user_workflow_authority', schema='platform')
     op.drop_table('user_supervisors', schema='platform')
