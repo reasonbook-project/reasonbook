@@ -1,0 +1,89 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Program profile (Tier 3): ssdi-cdr
+# Social Security Disability Insurance — Continuing Disability Review.
+# Reference profile for the recertification archetype.
+# =============================================================================
+
+schema_version: "1.0"
+
+profile:
+  id: ssdi-cdr
+  name: SSDI Continuing Disability Review
+  display_name: SSDI Continuing Disability Review
+  binds_archetype: recertification
+  agency: SSA
+  awarding_agency: Social Security Administration
+  federal_archetype: recertification
+
+# --- profile_required ---------------------------------------------------
+
+decision_logic:
+  type: eligibility_ruleset
+  ruleset_version: "POMS-DI-13005"
+  composition:
+    - id: medical_improvement_review
+    - id: substantial_gainful_activity_check   # SGA threshold
+    - id: trial_work_period_check
+    - id: continuing_eligibility_evaluation
+  cycle_drivers:
+    - medical_improvement_expected: 6_to_18_months
+    - medical_improvement_possible: 3_years
+    - medical_improvement_not_expected: 5_to_7_years
+
+authority:
+  delegation_assignment:
+    approving_official_role: disability_examiner_supervisor
+    matrix: shared/authority.yaml
+    citation: POMS DI 28005 / SSA delegation matrix
+
+role_assignments:
+  claimant: ssdi_beneficiary
+  caseworker: disability_examiner
+  supervisor: disability_examiner_supervisor
+  oversight: ssa_oig
+
+vocabulary:
+  recert_due: cdr_due
+  data_refresh: medical_evidence_update
+  ruleset_reevaluation: continuing_disability_evaluation
+  redetermination: cessation_or_continuation_decision
+  continuation_outcome: benefit_continuation_notice
+
+# --- profile_extensible -------------------------------------------------
+
+stage_overrides:
+  data_refresh:
+    sla_hint_hours: 720                  # MER request turnaround
+  redetermination:
+    label: CDR final action
+
+data_sources:
+  - ssa_ssn_verification
+  - ssa_mer                              # medical evidence of record
+  - state_dds_decision                   # state Disability Determination Services
+  - treasury_do_not_pay
+  - hhs_leie
+
+reconstructability:
+  retention_months: 84                   # SSA permanent record minimum
+
+# --- Matter lifecycle (TENANCY-MODEL §11.2 + §14.4) ----------------------
+# SSA-administered recertification of an individual beneficiary. No state
+# pass-through; no recipient organization.
+definition_quality: clear
+
+defaults:
+  federal:
+    active_archetypes: [recertification]
+    authority_role: awarding_official
+  state:
+    active_archetypes: []
+    authority_role: null
+  recipient:
+    active_archetypes: []                # beneficiary, not an org
+    authority_role: null
+
+heartbeat:
+  outcome_rollup_days: 90                # CDR cycle reporting

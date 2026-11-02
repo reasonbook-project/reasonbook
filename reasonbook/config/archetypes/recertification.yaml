@@ -1,0 +1,164 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Archetype (Tier 2): recertification
+# Periodic re-determination of an individual's eligibility (SNAP recert,
+# SSDI CDR, Medicaid renewal, Pell continuation). High volume — most cases
+# auto-renew and are recorded but not wrapped in a governed Decision unless
+# a trigger fires. Conforms to archetype.schema.yaml.
+# =============================================================================
+
+schema_version: "1.0"
+
+archetype:
+  id: recertification
+  name: Recertification
+  description: >
+    Time-triggered re-determination of a continuing benefit. Most cases
+    auto-renew based on current rules; the lifecycle attaches when an
+    override, adverse action, appeal, or sample drives review.
+  family: [entitlement]
+  flow: forward
+  decision_basis: eligibility_rules
+  promotes: on_trigger
+
+ledger:
+  records: all_determinations
+  reconstructable: true
+promotion_triggers: [override, adverse_action, appeal, sample, fraud_flag]
+
+flow_template:
+  tiers: [awarding_agency, pass_through, beneficiary]
+  required_edges: [awards, disburses_to]
+  optional_edges: [passes_through]
+  edge_types: [awards, passes_through, disburses_to]
+
+stages:
+  - id: recert_due
+    maps_to: signal
+    label: Recertification due
+    gate: none
+    decision_basis_step: false
+    required_evidence: [prior_determination, recert_window]
+    sla_hint_hours: 24
+  - id: data_refresh
+    maps_to: owner
+    label: Data refresh
+    gate: none
+    decision_basis_step: false
+    required_evidence: [identity_recheck, income_refresh, exclusion_recheck]
+    sla_hint_hours: 168
+  - id: ruleset_reevaluation
+    maps_to: decision
+    label: Eligibility re-evaluation
+    gate: none                           # routine auto-eval
+    decision_basis_step: true
+    required_evidence: [ruleset_result]
+    sla_hint_hours: 24
+  - id: redetermination
+    maps_to: action
+    label: Redetermination
+    gate: conditional                    # authority only when promoted
+    decision_basis_step: false
+    required_evidence: [benefit_recalc]
+    sla_hint_hours: 24
+  - id: continuation_outcome
+    maps_to: outcome
+    label: Continuation, change, or termination
+    gate: none
+    decision_basis_step: false
+    required_evidence: [notice]
+    sla_hint_hours: 48
+
+roles:
+  - id: claimant
+    label: Claimant
+    authority: false
+  - id: caseworker
+    label: Caseworker
+    authority: false
+  - id: supervisor
+    label: Supervisor
+    authority: true
+  - id: oversight
+    label: Oversight / OIG
+    authority: false
+
+authority:
+  delegation_ref: shared/authority.yaml
+  gated_transitions: [redetermination]
+
+evidence:
+  kinds:
+    - prior_determination
+    - recert_window
+    - identity_recheck
+    - income_refresh
+    - exclusion_recheck
+    - ruleset_result
+    - benefit_recalc
+    - notice
+  attachments: true
+
+overrides:
+  allowed: true
+  rationale_required: true
+  outcome_alignment_check: true          # override is itself a promotion_trigger
+
+reconstructability:
+  standard_ref: shared/reconstructability.yaml
+  retention_months: 24
+
+outcomes:
+  - id: continued
+    label: Benefit continued
+    terminal: true
+  - id: adjusted
+    label: Benefit adjusted
+    terminal: true
+  - id: terminated
+    label: Benefit terminated
+    terminal: true                       # contestable → routes to adverse_action_appeal
+  - id: pending_info
+    label: Pending information
+    terminal: false
+
+events:
+  - recert_window_opened
+  - data_refreshed
+  - ruleset_reevaluated
+  - redetermination_made
+  - override_recorded
+  - promoted_to_decision                 # emitted when a trigger fires
+  - notice_issued
+
+data_sources:
+  - ssa_ssn_verification
+  - irs_4506c
+  - state_eligibility_db
+  - treasury_do_not_pay
+  - hhs_leie
+
+profile_extensible:
+  - stages[].label
+  - stages[].sla_hint_hours
+  - roles[].label
+  - decision_logic
+  - vocabulary
+  - data_sources
+  - reconstructability.retention_months
+
+profile_required:
+  - decision_logic
+  - authority.delegation_assignment
+  - vocabulary
+  - role_assignments
+
+# --- Upstream review (TENANCY-MODEL §5) -----------------------------------
+# Routine recertification — every action notifies upstream; no gates by
+# default. Recipients flowing through their normal renewal cycle don't
+# require federal sign-off.
+upstream_review: {}
+  # All actions (on_promote, on_outcome, on_modification, on_adverse_action,
+  # on_closeout) default to notify.
+

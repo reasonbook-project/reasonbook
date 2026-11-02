@@ -1,0 +1,168 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Archetype (Tier 2): adverse_action
+# Denials, terminations, debarments, suspensions, and the appeal flow that
+# follows them. Reverse-flow — these are consequences of a prior determination
+# rather than fresh forward applications — with statutory due-process
+# requirements that ALL cases carry full governance.
+# Conforms to archetype.schema.yaml.
+# =============================================================================
+
+schema_version: "1.0"
+
+archetype:
+  id: adverse_action
+  name: Adverse action
+  description: >
+    Adverse outcomes (denial, termination, debarment, suspension) and the
+    appeal lifecycle that follows. Due-process discipline applies to every
+    case; every adverse action is a governed Decision and every appeal
+    spawns its own Decision linked to the originating action.
+  family: [grant, entitlement, procurement]
+  flow: reverse
+  decision_basis: authorization
+  promotes: every_case
+
+ledger:
+  records: all_determinations
+  reconstructable: true
+promotion_triggers: [override, adverse_action, appeal, fraud_flag]
+
+flow_template:
+  tiers: [awarding_agency, recipient, beneficiary]
+  required_edges: [awards]
+  optional_edges: [passes_through, disburses_to, pays]
+  edge_types: [awards, passes_through, disburses_to, pays]
+
+stages:
+  - id: trigger
+    maps_to: signal
+    label: Adverse-action trigger
+    gate: none
+    decision_basis_step: false
+    required_evidence: [trigger_record, prior_determination]
+    sla_hint_hours: 48
+  - id: notice_preparation
+    maps_to: owner
+    label: Notice preparation
+    gate: none
+    decision_basis_step: false
+    required_evidence: [draft_notice, fact_basis, legal_basis]
+    sla_hint_hours: 168
+  - id: due_process
+    maps_to: decision
+    label: Due-process evaluation
+    gate: none
+    decision_basis_step: true            # due-process and statutory basis applied
+    required_evidence: [response_window, hearing_record]
+    sla_hint_hours: 720
+  - id: authority_decision
+    maps_to: action
+    label: Authority decision
+    gate: authority
+    decision_basis_step: false
+    required_evidence: [final_decision_record]
+    sla_hint_hours: 240
+  - id: notice_and_appeal_rights
+    maps_to: outcome
+    label: Notice & appeal rights
+    gate: none
+    decision_basis_step: false
+    required_evidence: [final_notice]
+    sla_hint_hours: 120
+
+roles:
+  - id: subject
+    label: Subject of adverse action
+    authority: false
+  - id: investigator
+    label: Investigator / caseworker
+    authority: false
+  - id: hearing_officer
+    label: Hearing officer
+    authority: false
+  - id: deciding_official
+    label: Deciding official
+    authority: true
+  - id: oversight
+    label: Oversight / OIG
+    authority: false
+
+authority:
+  delegation_ref: shared/authority.yaml
+  gated_transitions: [authority_decision]
+
+evidence:
+  kinds:
+    - trigger_record
+    - prior_determination
+    - draft_notice
+    - fact_basis
+    - legal_basis
+    - response_window
+    - hearing_record
+    - final_decision_record
+    - final_notice
+  attachments: true
+
+overrides:
+  allowed: true                          # statutory carve-outs / mitigation
+  rationale_required: true
+  outcome_alignment_check: true
+
+reconstructability:
+  standard_ref: shared/reconstructability.yaml
+  retention_months: 36                   # appeals + audits run long
+
+outcomes:
+  - id: sustained
+    label: Adverse action sustained
+    terminal: true
+  - id: modified
+    label: Action modified
+    terminal: true
+  - id: rescinded
+    label: Action rescinded
+    terminal: true
+  - id: pending_appeal
+    label: Pending appeal
+    terminal: false
+
+events:
+  - trigger_recorded
+  - notice_drafted
+  - response_received
+  - hearing_held
+  - authority_decided
+  - override_recorded
+  - appeal_filed
+  - final_notice_issued
+
+data_sources:
+  - sam_exclusions
+  - hhs_leie
+  - oig_referrals
+
+profile_extensible:
+  - stages[].label
+  - stages[].sla_hint_hours
+  - roles[].label
+  - decision_logic
+  - vocabulary
+  - data_sources
+  - reconstructability.retention_months
+
+profile_required:
+  - decision_logic
+  - authority.delegation_assignment
+  - vocabulary
+  - role_assignments
+
+# --- Upstream review (TENANCY-MODEL §5) -----------------------------------
+# Adverse actions (debarment / suspension / recoupment) always gate
+# upstream — concurrence required from the tier above.
+upstream_review:
+  on_adverse_action: gate
+  # on_promote, on_outcome, on_modification, on_closeout default to notify.
+

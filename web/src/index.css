@@ -1,0 +1,139 @@
+/* Copyright 2026 Data Visuals LLC */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+/* Bespoke @layer components block — see RECONCILE-tailwind.md §4 + §5.
+   Sits between components and utilities so utilities still win.
+   Reuses existing semantic groups. */
+@import "./bespoke-components.css";
+@tailwind utilities;
+
+/*
+ * Design system tokens.
+ *
+ * Two layers coexist:
+ *   - Legacy hex tokens (--color-*) for surfaces that haven't been migrated
+ *     (the legacy critical/warning/info/resolved status badges, etc).
+ *   - SaaS rebrand tokens (--navy, --ink, etc.) in HSL channel form per the
+ *     SaaS frontend spec v1.0 §3.1. These pair with shadcn's
+ *     hsl(var(--token)) pattern so primitives inherit automatically.
+ */
+
+@layer base {
+  :root {
+    /* ── SaaS rebrand: brand (§3.1) ─────────────────────── */
+    /* Brand-guide navy. Off-by-one drift in HSL channels was rendering a
+       different shade than the mockups; reconciled per
+       docs/architecture/backlog/02_style_fix/RECONCILE-tailwind.md §1. */
+    --navy: 216 55% 43%;          /* #3162AA — Reasonbook blue */
+    --navy-deep: 215 56% 34%;     /* #264E86 */
+    --navy-soft: 215 52% 94%;     /* #E6EDF7 */
+    --navy-tint: 210 50% 97%;     /* #F4F8FC */
+
+    /* ── SaaS rebrand: ink (§3.1) ───────────────────────── */
+    --ink: 220 17% 17%;           /* #1F2937 */
+    --ink-soft: 220 13% 34%;      /* #4B5563 */
+    --ink-muted: 220 9% 46%;      /* #6B7280 */
+    --ink-faint: 220 9% 65%;      /* #9CA3AF */
+
+    /* ── SaaS rebrand: rules (§3.1) ─────────────────────── */
+    --rule: 220 14% 83%;          /* #D1D5DB */
+    --rule-soft: 220 13% 91%;     /* #E5E7EB */
+    --rule-faint: 220 11% 95%;    /* #F1F2F4 */
+
+    /* ── SaaS rebrand: surfaces (§3.1) ──────────────────── */
+    --paper: 0 0% 100%;           /* #FFFFFF */
+    --bg: 220 14% 96%;            /* #F4F5F7 */
+    --bg-warm: 60 9% 98%;         /* #FAFAF8 */
+
+    /* ── SaaS rebrand: semantic accents (§3.1) ──────────── */
+    --accent-warning: 32 81% 36%; /* #B45309 */
+    --accent-success: 158 64% 30%; /* #10764A */
+
+    /* ── shadcn variable mappings (§3.1) ────────────────── */
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --card: var(--paper);
+    --card-foreground: var(--ink);
+    --popover: var(--paper);
+    --popover-foreground: var(--ink);
+    --primary: var(--navy);
+    --primary-foreground: var(--paper);
+    --secondary: var(--navy-tint);
+    --secondary-foreground: var(--navy-deep);
+    --muted: var(--rule-faint);
+    --muted-foreground: var(--ink-muted);
+    --accent: var(--navy-soft);
+    --accent-foreground: var(--navy-deep);
+    --destructive: 0 70% 47%;
+    --destructive-foreground: var(--paper);
+    --border: var(--rule-soft);
+    --input: var(--rule);
+    --ring: var(--navy);
+    --radius: 0.375rem;
+
+    /* ── Status-color tokens (decision-row badges, alert chips) ── */
+    --color-critical-bg: #fcebeb;
+    --color-critical-text: #791f1f;
+    --color-critical-dot: #a32d2d;
+
+    --color-warning-bg: #faeeda;
+    --color-warning-text: #633806;
+    --color-warning-dot: #ba7517;
+
+    --color-info-bg: #e6f1fb;
+    --color-info-text: #0c447c;
+    --color-info-dot: #185fa5;
+
+    --color-resolved-bg: #e1f5ee;
+    --color-resolved-text: #085041;
+    --color-resolved-dot: #0f6e56;
+  }
+
+  /*
+   * Dark-mode skeleton — tokens defined for future dark-theme work
+   * but not yet wired. Per spec §7 step 12, dark mode is out of scope for v1.
+   */
+  .dark {
+    --paper: 220 17% 11%;
+    --bg: 220 17% 9%;
+    --bg-warm: 220 14% 12%;
+    --ink: 0 0% 96%;
+    --ink-soft: 220 9% 78%;
+    --ink-muted: 220 9% 60%;
+    --ink-faint: 220 9% 42%;
+    --rule: 220 14% 25%;
+    --rule-soft: 220 13% 20%;
+    --rule-faint: 220 13% 16%;
+    --navy-soft: 211 50% 22%;
+    --navy-tint: 211 30% 16%;
+  }
+
+  * {
+    @apply border-rule-soft;
+  }
+
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  /* ADR-09: Space Grotesk for display / headings. Mirrors
+     docs/architecture/_archive/UI Surface/dp-ui.css `h1,h2,h3 { font-family: var(--disp) }`.
+     Class-level `font-mono` utilities still win for eyebrow labels. */
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+
+  .font-mono {
+    font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+}

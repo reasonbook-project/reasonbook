@@ -1,0 +1,102 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Program profile (Tier 3): nih-r01
+# Binds archetype competitive_award and fills ONLY profile_extensible /
+# profile_required slots. Stages, gates, outcomes, events are INHERITED.
+# This is the reference profile — exercises every layer.
+# =============================================================================
+
+schema_version: "1.0"
+
+profile:
+  id: nih-r01
+  name: NIH R01 Research Project Grant
+  display_name: NIH R01 Research Project Grant
+  binds_archetype: competitive_award
+  agency: NIH
+  awarding_agency: NIH — Office of Extramural Research
+  federal_archetype: competitive_award
+
+# --- profile_required ---------------------------------------------------
+
+decision_logic:
+  type: review_criteria
+  criteria:
+    - id: significance
+      weight: 0.30
+    - id: investigators
+      weight: 0.15
+    - id: innovation
+      weight: 0.15
+    - id: approach
+      weight: 0.30
+    - id: environment
+      weight: 0.10
+  scoring:
+    scale: 1-9            # NIH impact score (1 best)
+    aggregate: mean
+    rank_within: study_section
+
+authority:
+  delegation_assignment:
+    approving_official_role: ic_director
+    matrix: shared/authority.yaml
+    citation: NIH delegation order / FAR 1.602 analog
+
+role_assignments:
+  applicant: principal_investigator
+  reviewer: study_section_member
+  program_officer: nih_program_officer
+  approving_official: ic_director
+  oversight: nih_oig
+
+vocabulary:
+  application: grant_application
+  eligibility_screen: completeness_check
+  merit_review: study_section_review
+  summary_statement: summary_statement
+  authority_decision: council_concurrence
+  disposition: notice_of_award
+
+# --- profile_extensible (optional tweaks) -------------------------------
+
+stage_overrides:
+  merit_review:
+    sla_hint_hours: 2160        # ~90 days, NIH cycle (tighten/extend within policy)
+  authority_decision:
+    label: Advisory council & IC director
+
+data_sources:
+  - sam_gov_entity
+  - sam_exclusions
+  - hhs_leie
+  - eRA_commons            # NIH-specific feed (build-new adapter)
+
+reconstructability:
+  retention_months: 36     # extend beyond archetype default of 24
+
+# --- Matter lifecycle (TENANCY-MODEL §11.2 + §14.4) ----------------------
+# Federal NIH directly to research institution (recipient). No state tier
+# in the chain for R01; state defaults are empty by design.
+definition_quality: clear
+
+defaults:
+  federal:
+    active_archetypes: [competitive_award]
+    authority_role: awarding_official
+  state:
+    active_archetypes: []                # no state pass-through
+    authority_role: null
+  recipient:
+    active_archetypes:
+      - payment_authorization
+      - modification
+      - adverse_action
+    authority_role: certifying_officer
+
+heartbeat:
+  recipient_draw_days: 60                # first drawdown after award setup
+  recipient_draw_severity: medium
+  outcome_rollup_days: 120               # annual progress report cadence
+  outcome_rollup_severity: medium

@@ -1,0 +1,168 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Archetype (Tier 2): formula_allocation
+# Formula-based grant allocations (CDBG, Title I, SNAP admin funds, LIHEAP).
+# Forward-flow, low-volume per cycle, one Decision per allocation period.
+# Conforms to archetype.schema.yaml.
+# =============================================================================
+
+schema_version: "1.0"
+
+archetype:
+  id: formula_allocation
+  name: Formula allocation
+  description: >
+    Statutory or regulatory formula computes an allocation per recipient.
+    Forward-flow, one Decision per allocation cycle (often annual). The
+    governance work is in the formula inputs, override discipline, and
+    apportionment audit trail — not merit review.
+  family: [grant]
+  flow: forward
+  decision_basis: formula
+  promotes: every_case
+
+ledger:
+  records: all_determinations
+  reconstructable: true
+promotion_triggers: [override, adverse_action, appeal, fraud_flag]
+
+flow_template:
+  tiers: [awarding_agency, pass_through, subrecipient, beneficiary]
+  required_edges: [awards, disburses_to]
+  optional_edges: [passes_through, pays]
+  edge_types: [awards, passes_through, disburses_to, pays]
+
+stages:
+  - id: cycle_open
+    maps_to: signal
+    label: Allocation cycle opens
+    gate: none
+    decision_basis_step: false
+    required_evidence: [appropriation_notice, formula_version]
+    sla_hint_hours: 72
+  - id: input_assembly
+    maps_to: owner
+    label: Input assembly
+    gate: none
+    decision_basis_step: false
+    required_evidence: [population_data, eligibility_data, prior_year_audit]
+    sla_hint_hours: 240
+  - id: formula_run
+    maps_to: decision
+    label: Formula computation
+    gate: none
+    decision_basis_step: true            # the formula is applied here
+    required_evidence: [formula_inputs, formula_output, sensitivity_check]
+    sla_hint_hours: 120
+  - id: apportionment
+    maps_to: action
+    label: Apportionment & obligation
+    gate: authority                      # awarding official sign-off
+    decision_basis_step: false
+    required_evidence: [apportionment_table, obligation_record]
+    sla_hint_hours: 240
+  - id: notification
+    maps_to: outcome
+    label: Allocation notification
+    gate: none
+    decision_basis_step: false
+    required_evidence: [allocation_notice]
+    sla_hint_hours: 120
+
+roles:
+  - id: recipient
+    label: Allocation recipient
+    authority: false
+  - id: formula_steward
+    label: Formula steward
+    authority: false
+  - id: program_officer
+    label: Program officer
+    authority: false
+  - id: approving_official
+    label: Approving official
+    authority: true
+  - id: oversight
+    label: Oversight / OIG
+    authority: false
+
+authority:
+  delegation_ref: shared/authority.yaml
+  gated_transitions: [apportionment]
+
+evidence:
+  kinds:
+    - appropriation_notice
+    - formula_version
+    - population_data
+    - eligibility_data
+    - prior_year_audit
+    - formula_inputs
+    - formula_output
+    - sensitivity_check
+    - apportionment_table
+    - obligation_record
+    - allocation_notice
+  attachments: true
+
+overrides:
+  allowed: true                          # statutory override / hold-harmless adjustment
+  rationale_required: true
+  outcome_alignment_check: true
+
+reconstructability:
+  standard_ref: shared/reconstructability.yaml
+  retention_months: 36                   # multi-year allocations need longer audit window
+
+outcomes:
+  - id: allocated
+    label: Allocated
+    terminal: true
+  - id: withheld
+    label: Withheld
+    terminal: true
+  - id: deferred
+    label: Deferred to next cycle
+    terminal: false
+
+events:
+  - cycle_opened
+  - inputs_assembled
+  - formula_computed
+  - sensitivity_recorded
+  - override_recorded
+  - apportionment_signed
+  - allocation_notified
+
+data_sources:
+  - sam_gov_entity
+  - sam_exclusions
+  - census_population
+  - prior_year_audit_extract
+
+# --- Extension contract ----------------------------------------------------
+profile_extensible:
+  - stages[].label
+  - stages[].sla_hint_hours              # tighten only
+  - roles[].label
+  - decision_logic                       # formula spec (variables, weights, caps)
+  - vocabulary
+  - data_sources
+  - reconstructability.retention_months  # extend only
+
+profile_required:
+  - decision_logic
+  - authority.delegation_assignment
+  - vocabulary
+  - role_assignments
+
+# --- Upstream review (TENANCY-MODEL §5) -----------------------------------
+# Formula allocations are the federal funding pipeline; modifications,
+# adverse actions, and closeout all gate upstream.
+upstream_review:
+  on_modification: gate
+  on_adverse_action: gate
+  on_closeout: gate
+  # on_promote, on_outcome default to notify.
+

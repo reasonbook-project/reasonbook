@@ -1,0 +1,160 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Archetype (Tier 2): payment_authorization
+# Disbursement authorization checks (Treasury Do Not Pay, GSA SAM exclusions,
+# award-term compliance) before funds move. High volume — most payments pass
+# and are recorded; the lifecycle attaches only when a check flags or an
+# override fires. Conforms to archetype.schema.yaml.
+# =============================================================================
+
+schema_version: "1.0"
+
+archetype:
+  id: payment_authorization
+  name: Payment authorization
+  description: >
+    Authorization check before a disbursement leaves Treasury. Validates
+    recipient against Do Not Pay, exclusion lists, and award-term
+    compliance. Most payments pass without human review; flagged
+    payments promote to a governed Decision with full audit trail.
+  family: [grant, entitlement, procurement]
+  flow: forward
+  decision_basis: authorization
+  promotes: on_trigger
+
+ledger:
+  records: all_determinations
+  reconstructable: true
+promotion_triggers: [override, adverse_action, fraud_flag, sample]
+
+flow_template:
+  tiers: [awarding_agency, pass_through, subrecipient, beneficiary]
+  required_edges: [disburses_to, pays]
+  optional_edges: [passes_through]
+  edge_types: [awards, passes_through, disburses_to, pays]
+
+stages:
+  - id: payment_request
+    maps_to: signal
+    label: Payment request
+    gate: none
+    decision_basis_step: false
+    required_evidence: [request_record, recipient_identity]
+    sla_hint_hours: 4
+  - id: check_run
+    maps_to: owner
+    label: Authorization checks
+    gate: none
+    decision_basis_step: false
+    required_evidence: [do_not_pay_check, exclusion_check, term_compliance_check]
+    sla_hint_hours: 4
+  - id: authorization_evaluation
+    maps_to: decision
+    label: Authorization evaluation
+    gate: none                           # routine auto-eval; flagged cases promote
+    decision_basis_step: true
+    required_evidence: [check_result]
+    sla_hint_hours: 4
+  - id: disbursement
+    maps_to: action
+    label: Disbursement
+    gate: conditional                    # authority only when promoted
+    decision_basis_step: false
+    required_evidence: [disbursement_record]
+    sla_hint_hours: 24
+  - id: payment_outcome
+    maps_to: outcome
+    label: Payment outcome
+    gate: none
+    decision_basis_step: false
+    required_evidence: [payment_confirmation]
+    sla_hint_hours: 24
+
+roles:
+  - id: payee
+    label: Payee
+    authority: false
+  - id: payment_clerk
+    label: Payment clerk
+    authority: false
+  - id: certifying_officer
+    label: Certifying officer
+    authority: true
+  - id: oversight
+    label: Oversight / OIG
+    authority: false
+
+authority:
+  delegation_ref: shared/authority.yaml
+  gated_transitions: [disbursement]      # enforced only when promoted
+
+evidence:
+  kinds:
+    - request_record
+    - recipient_identity
+    - do_not_pay_check
+    - exclusion_check
+    - term_compliance_check
+    - check_result
+    - disbursement_record
+    - payment_confirmation
+  attachments: true
+
+overrides:
+  allowed: true                          # exceptional release w/ certifier sign-off
+  rationale_required: true
+  outcome_alignment_check: true          # override is a promotion_trigger
+
+reconstructability:
+  standard_ref: shared/reconstructability.yaml
+  retention_months: 36                   # IPERA / payment integrity audit window
+
+outcomes:
+  - id: paid
+    label: Paid
+    terminal: true
+  - id: blocked
+    label: Blocked
+    terminal: true
+  - id: held_for_review
+    label: Held for review
+    terminal: false
+
+events:
+  - payment_requested
+  - checks_run
+  - flag_recorded
+  - override_recorded
+  - promoted_to_decision                 # emitted when a trigger fires
+  - disbursement_authorized
+  - payment_confirmed
+
+data_sources:
+  - treasury_do_not_pay
+  - sam_exclusions
+  - hhs_leie
+  - gsa_sam
+
+profile_extensible:
+  - stages[].label
+  - stages[].sla_hint_hours
+  - roles[].label
+  - decision_logic
+  - vocabulary
+  - data_sources
+  - reconstructability.retention_months
+
+profile_required:
+  - decision_logic
+  - authority.delegation_assignment
+  - vocabulary
+  - role_assignments
+
+# --- Upstream review (TENANCY-MODEL §5) -----------------------------------
+# Routine payment authorization — every action notifies upstream by default.
+# Specific programs may opt into gates via their own override but the
+# archetype default is light-touch (payments are high-volume).
+upstream_review: {}
+  # All actions default to notify.
+

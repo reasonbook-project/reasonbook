@@ -1,0 +1,94 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Program profile (Tier 3): grant-debarment
+# Federal grant debarment action under 2 CFR 180. Reference profile for the
+# adverse_action_appeal archetype.
+# =============================================================================
+
+schema_version: "1.0"
+
+profile:
+  id: grant-debarment
+  name: Federal grant debarment (2 CFR 180)
+  display_name: Federal grant debarment (2 CFR 180)
+  binds_archetype: adverse_action
+  agency: GSA                            # SAM is the system of record; agencies refer
+  awarding_agency: Federal grantor (debarring official)
+  federal_archetype: adverse_action
+
+# --- profile_required ---------------------------------------------------
+
+decision_logic:
+  type: auth_check
+  basis_categories:
+    - id: conviction
+      citation: 2 CFR 180.800(a)(1)
+    - id: civil_judgment
+      citation: 2 CFR 180.800(a)(2)
+    - id: fraud_or_serious_misconduct
+      citation: 2 CFR 180.800(b)
+    - id: violation_of_terms
+      citation: 2 CFR 180.800(c)
+  evidence_standard: preponderance_of_evidence
+  due_process:
+    notice_of_proposed_debarment: true
+    response_window_days: 30
+    hearing_available: true
+    final_notice_required: true
+
+authority:
+  delegation_assignment:
+    approving_official_role: agency_debarring_official
+    matrix: shared/authority.yaml
+    citation: 2 CFR 180.930 / agency suspension-and-debarment manual
+
+role_assignments:
+  subject: respondent
+  investigator: suspending_debarring_specialist
+  hearing_officer: agency_hearing_officer
+  deciding_official: agency_debarring_official
+  oversight: agency_oig
+
+vocabulary:
+  trigger: referral_for_debarment
+  notice_preparation: notice_of_proposed_debarment
+  due_process: respondent_response_and_hearing
+  authority_decision: debarment_decision
+  notice_and_appeal_rights: final_notice_and_sam_action
+
+# --- profile_extensible -------------------------------------------------
+
+stage_overrides:
+  due_process:
+    sla_hint_hours: 1440                 # 30-day response + hearing scheduling
+  notice_and_appeal_rights:
+    label: Final notice & SAM exclusion action
+
+data_sources:
+  - sam_exclusions
+  - hhs_leie
+  - oig_referrals
+  - doj_judgment_db
+
+reconstructability:
+  retention_months: 60                   # SAM action records run long
+
+# --- Matter lifecycle (TENANCY-MODEL §11.2 + §14.4) ----------------------
+# Debarment is initiated by the federal grantor against a respondent
+# (often a contractor / recipient). No state tier in the standard chain.
+definition_quality: clear
+
+defaults:
+  federal:
+    active_archetypes: [adverse_action]
+    authority_role: awarding_official
+  state:
+    active_archetypes: []
+    authority_role: null
+  recipient:
+    active_archetypes: [adverse_action]  # respondent participates in appeal
+    authority_role: certifying_officer
+
+heartbeat:
+  outcome_rollup_days: 60                # post-debarment SAM record update

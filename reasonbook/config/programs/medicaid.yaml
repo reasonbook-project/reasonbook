@@ -1,0 +1,103 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Program profile (Tier 3): medicaid
+# Medicaid federal financial participation (FFP) — HHS/CMS pass-through to
+# state Medicaid agencies under Title XIX of the Social Security Act.
+# Formula_allocation archetype (federal share is computed per FMAP).
+# =============================================================================
+
+schema_version: "1.0"
+
+profile:
+  id: medicaid
+  name: Medicaid (Federal Financial Participation)
+  display_name: Medicaid FFP
+  binds_archetype: formula_allocation
+  agency: HHS
+  awarding_agency: HHS
+  federal_archetype: formula_allocation
+
+# --- profile_required ---------------------------------------------------
+
+decision_logic:
+  type: formula
+  variables:
+    - id: state_per_capita_income
+      source: bea_per_capita_income
+    - id: national_per_capita_income
+      source: bea_per_capita_income
+  weights:
+    fmap:
+      state_per_capita_income: 1.0
+      national_per_capita_income: 1.0
+  rule: |
+    fmap = 1 - 0.45 * (state_per_capita_income / national_per_capita_income) ** 2
+    fmap = clamp(fmap, 0.50, 0.83)
+
+authority:
+  delegation_assignment:
+    approving_official_role: cms_administrator
+    matrix: shared/authority.yaml
+    citation: 42 CFR 433 subpart A / CMS delegation
+
+role_assignments:
+  recipient: state_medicaid_agency
+  formula_steward: cms_office_of_the_actuary
+  program_officer: cms_medicaid_regional_office
+  approving_official: cms_administrator
+  oversight: hhs_oig
+
+vocabulary:
+  cycle_open: quarterly_grant_award
+  formula_run: fmap_computation
+  apportionment: cms_37_grant_award
+  notification: cms_pmts_notice
+
+# --- profile_extensible ------------------------------------------------
+
+stage_overrides:
+  input_assembly:
+    sla_hint_hours: 168                 # quarterly cycle — 1 week assembly
+  apportionment:
+    label: Quarterly grant award (CMS-37)
+
+data_sources:
+  - sam_gov_entity
+  - sam_exclusions
+  - cms_pmts
+  - bea_per_capita_income
+  - cms_64_state_expenditure_reports
+
+reconstructability:
+  retention_months: 60                  # CMS audit window per OIG / GAO
+
+# --- Matter lifecycle (TENANCY-MODEL §11.2 + §14.4) ----------------------
+# Federal (CMS) → State Medicaid agency → Provider / vendor. State pickup
+# deadline drives the ownership_gap alert for the federal-to-state transit
+# window; provider-tier draws drive the phantom-subrecipient watch.
+definition_quality: clear
+
+defaults:
+  federal:
+    active_archetypes: [formula_allocation]
+    authority_role: awarding_official
+  state:
+    active_archetypes:
+      - formula_allocation
+      - eligibility_determination
+      - payment_authorization
+    authority_role: state_program_director
+  recipient:
+    active_archetypes:
+      - payment_authorization
+      - eligibility_determination
+      - adverse_action
+    authority_role: certifying_officer
+
+heartbeat:
+  state_pickup_days: 30
+  state_pickup_severity: high
+  recipient_draw_days: 90
+  recipient_draw_severity: medium
+  outcome_rollup_days: 60

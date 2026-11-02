@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+.tox/
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Vite
+web/dist/
+web/.vite/
+
+# Built SPA copied into the Python package at image build time
+reasonbook/static/web/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+secrets/
+*-credentials.txt
+
+# Local data / SQLite
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+postgres-data/
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+web/e2e/.auth/

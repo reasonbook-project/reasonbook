@@ -1,0 +1,162 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Archetype (Tier 2): competitive_award
+# Discretionary / merit-reviewed grants, cooperative agreements, FAR source
+# selection. Conforms to archetype.schema.yaml.
+# =============================================================================
+
+schema_version: "1.0"
+
+archetype:
+  id: competitive_award
+  name: Competitive award
+  description: >
+    Merit-reviewed selection among applicants for a discretionary award.
+    Forward-flow, one Decision per application.
+  family: [grant]
+  flow: forward
+  decision_basis: review
+  promotes: every_case
+
+ledger:
+  records: all_determinations
+  reconstructable: true
+promotion_triggers: [override, adverse_action, appeal, fraud_flag]
+
+flow_template:
+  tiers: [awarding_agency, recipient, subrecipient]   # direct award, no state hop
+  required_edges: [awards]
+  optional_edges: [passes_through, pays]   # sub-awards to collaborating orgs
+  edge_types: [awards, passes_through, pays]
+
+stages:
+  - id: receipt
+    maps_to: signal
+    label: Application receipt
+    gate: none
+    decision_basis_step: false
+    required_evidence: [application]
+    sla_hint_hours: 72
+  - id: eligibility_screen
+    maps_to: owner
+    label: Eligibility screen
+    gate: none
+    decision_basis_step: false
+    required_evidence: [eligibility_check, exclusion_check]
+    sla_hint_hours: 120
+  - id: merit_review
+    maps_to: decision
+    label: Merit review
+    gate: none
+    decision_basis_step: true            # review criteria + scoring applied here
+    required_evidence: [reviewer_scores, summary_statement, coi_disclosure]
+    sla_hint_hours: 1440
+  - id: authority_decision
+    maps_to: action
+    label: Authority decision
+    gate: authority                      # awarding official / IC director
+    decision_basis_step: false
+    required_evidence: [funding_recommendation]
+    sla_hint_hours: 480
+  - id: disposition
+    maps_to: outcome
+    label: Award or decline
+    gate: none
+    decision_basis_step: false
+    required_evidence: [notice_of_award_or_decline]
+    sla_hint_hours: 120
+
+roles:
+  - id: applicant
+    label: Applicant
+    authority: false
+  - id: reviewer
+    label: Merit reviewer
+    authority: false
+  - id: program_officer
+    label: Program officer
+    authority: false
+  - id: approving_official
+    label: Approving official
+    authority: true
+  - id: oversight
+    label: Oversight / OIG
+    authority: false
+
+authority:
+  delegation_ref: shared/authority.yaml
+  gated_transitions: [authority_decision]
+
+evidence:
+  kinds:
+    - application
+    - eligibility_check
+    - exclusion_check          # SAM exclusions, LEIE
+    - reviewer_scores
+    - summary_statement
+    - coi_disclosure
+    - funding_recommendation
+    - notice_of_award_or_decline
+  attachments: true
+
+overrides:
+  allowed: true                # e.g. fund out of score order
+  rationale_required: true
+  outcome_alignment_check: true
+
+reconstructability:
+  standard_ref: shared/reconstructability.yaml
+  retention_months: 24
+
+outcomes:
+  - id: awarded
+    label: Awarded
+    terminal: true
+  - id: declined
+    label: Declined
+    terminal: true
+  - id: withdrawn
+    label: Withdrawn
+    terminal: true
+
+events:
+  - application_received
+  - eligibility_evaluated
+  - exclusion_checked
+  - scores_recorded
+  - coi_logged
+  - authority_decided
+  - override_recorded
+  - disposition_issued
+
+data_sources:
+  - sam_gov_entity
+  - sam_exclusions
+  - hhs_leie
+
+# --- Extension contract ----------------------------------------------------
+profile_extensible:
+  - stages[].label
+  - stages[].sla_hint_hours              # tighten only
+  - roles[].label
+  - decision_logic                       # review criteria + scoring
+  - vocabulary
+  - data_sources
+  - reconstructability.retention_months  # extend only
+
+profile_required:
+  - decision_logic
+  - authority.delegation_assignment
+  - vocabulary
+  - role_assignments
+
+# --- Upstream review (TENANCY-MODEL §5) -----------------------------------
+# Competitive awards are high-stakes federal-originating decisions.
+# All three policy-changing actions gate to upstream review.
+upstream_review:
+  on_modification: gate
+  on_adverse_action: gate
+  on_closeout: gate
+  # on_promote, on_outcome default to notify.
+

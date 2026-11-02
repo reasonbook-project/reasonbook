@@ -1,0 +1,164 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Archetype (Tier 2): identity_resolution
+# The adjudication surface for identity-family signals — the identity engine
+# raises a candidate conflict (duplicate claim, SSN reuse, UEI collision) and
+# an officer decides whether the candidates are the same entity or distinct
+# entities before any downstream matter can move. Reverse-flow: triggered by
+# a signal on an existing pipeline, not a fresh application. Every conflict
+# gets a Decision — the rationale is the artifact examiners ask for.
+# Conforms to archetype.schema.yaml.
+# =============================================================================
+
+schema_version: "1.0"
+
+archetype:
+  id: identity_resolution
+  name: Identity resolution
+  description: >
+    Adjudication of identity-family signals: two candidate records the
+    identity engine flagged as a possible match (same identity across two
+    state rolls, single SSN spanning multiple claimants, colliding UEIs).
+    Every conflict is a governed Decision with a written rationale; the
+    resolution propagates to affected matters before disbursement.
+  family: [grant, entitlement, procurement]
+  flow: reverse
+  decision_basis: review
+  promotes: every_case
+
+ledger:
+  records: all_determinations
+  reconstructable: true
+
+# Identity conflicts commonly indicate fraud; the fraud_flag trigger keeps
+# the promotion vocabulary aligned with the alert families upstream.
+promotion_triggers: [fraud_flag, override]
+
+flow_template:
+  tiers: [awarding_agency, recipient, beneficiary]
+  required_edges: [awards]
+  optional_edges: [passes_through, disburses_to, pays]
+  edge_types: [awards, passes_through, disburses_to, pays]
+
+stages:
+  - id: conflict_detected
+    maps_to: signal
+    label: Conflict detected
+    gate: none
+    decision_basis_step: false
+    required_evidence: [candidate_records, match_algorithm_output]
+    sla_hint_hours: 24
+  - id: evidence_gathered
+    maps_to: owner
+    label: Evidence gathered
+    gate: none
+    decision_basis_step: false
+    required_evidence: [uei_lookup, leie_lookup]
+    sla_hint_hours: 72
+  - id: adjudication
+    maps_to: decision
+    label: Adjudication
+    gate: none
+    decision_basis_step: true            # same-entity / different-entities test applied here
+    required_evidence: [rationale, statutory_basis]
+    sla_hint_hours: 96
+  - id: propagation
+    maps_to: action
+    label: Propagate to matters
+    gate: authority
+    decision_basis_step: false
+    required_evidence: [affected_matters_list]
+    sla_hint_hours: 48
+  - id: audit_note
+    maps_to: outcome
+    label: Audit note
+    gate: none
+    decision_basis_step: false
+    required_evidence: [final_resolution_record]
+    sla_hint_hours: 24
+
+roles:
+  - id: adjudicator
+    label: Adjudicating officer
+    authority: true
+  - id: identity_engineer
+    label: Identity-pipeline engineer
+    authority: false
+  - id: oversight
+    label: Oversight / OIG
+    authority: false
+
+authority:
+  delegation_ref: shared/authority.yaml
+  gated_transitions: [propagation]
+
+evidence:
+  kinds:
+    - candidate_records
+    - match_algorithm_output
+    - uei_lookup
+    - leie_lookup
+    - rationale
+    - statutory_basis
+    - affected_matters_list
+    - final_resolution_record
+  attachments: true
+
+overrides:
+  allowed: true
+  rationale_required: true
+  outcome_alignment_check: true
+
+reconstructability:
+  standard_ref: shared/reconstructability.yaml
+  retention_months: 36                   # audits reference identity calls years later
+
+outcomes:
+  - id: same_entity
+    label: Same entity — records merged
+    terminal: true
+  - id: different_entities
+    label: Different entities — records kept separate
+    terminal: true
+  - id: referred_upstream
+    label: Referred upstream for review
+    terminal: false
+  - id: undetermined
+    label: Undetermined — pending evidence
+    terminal: false
+
+events:
+  - conflict_recorded
+  - candidate_evidence_attached
+  - adjudicated
+  - propagation_applied
+  - override_recorded
+  - resolution_finalized
+
+data_sources:
+  - sam_entity
+  - hhs_leie
+  - usaspending
+
+profile_extensible:
+  - stages[].label
+  - stages[].sla_hint_hours
+  - roles[].label
+  - decision_logic
+  - vocabulary
+  - data_sources
+  - reconstructability.retention_months
+
+profile_required:
+  - decision_logic
+  - authority.delegation_assignment
+  - vocabulary
+  - role_assignments
+
+# --- Upstream review (TENANCY-MODEL §5) -----------------------------------
+# Identity resolutions that reverse a prior determination gate upstream —
+# the tier above needs to concur before a merge/split cascades to matters.
+upstream_review:
+  on_adverse_action: gate
+  # on_promote, on_outcome, on_modification, on_closeout default to notify.

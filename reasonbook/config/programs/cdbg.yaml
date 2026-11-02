@@ -1,0 +1,111 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Program profile (Tier 3): cdbg
+# Community Development Block Grant — HUD entitlement formula. Reference
+# profile for the formula_allocation archetype.
+# =============================================================================
+
+schema_version: "1.0"
+
+profile:
+  id: cdbg
+  name: Community Development Block Grant
+  display_name: Community Development Block Grant
+  binds_archetype: formula_allocation
+  agency: HUD
+  awarding_agency: HUD
+  federal_archetype: formula_allocation
+
+# --- profile_required ---------------------------------------------------
+
+decision_logic:
+  type: formula
+  variables:
+    - id: population
+      source: census_population
+    - id: poverty_count
+      source: acs_5_year
+    - id: housing_overcrowding
+      source: acs_5_year
+    - id: housing_age
+      source: acs_5_year
+    - id: growth_lag
+      source: census_population
+  weights:
+    metropolitan_formula_a:
+      poverty_count: 0.50
+      population: 0.25
+      housing_overcrowding: 0.25
+    metropolitan_formula_b:
+      poverty_count: 0.30
+      housing_age: 0.50
+      growth_lag: 0.20
+  rule: max(formula_a, formula_b)        # statutory dual-formula
+
+authority:
+  delegation_assignment:
+    approving_official_role: cpd_assistant_secretary
+    matrix: shared/authority.yaml
+    citation: 24 CFR 570 / HUD delegation order
+
+role_assignments:
+  recipient: entitlement_jurisdiction
+  formula_steward: hud_cpd_analyst
+  program_officer: cpd_field_office_representative
+  approving_official: cpd_assistant_secretary
+  oversight: hud_oig
+
+vocabulary:
+  cycle_open: program_year_announcement
+  formula_run: formula_computation
+  apportionment: formula_grant_allocation
+  notification: allocation_announcement
+
+# --- profile_extensible ------------------------------------------------
+
+stage_overrides:
+  input_assembly:
+    sla_hint_hours: 480                  # ACS data assembly is slow
+  apportionment:
+    label: Allocation table approval
+
+data_sources:
+  - sam_gov_entity
+  - sam_exclusions
+  - census_population
+  - acs_5_year
+  - hud_grantee_recipient_db
+
+reconstructability:
+  retention_months: 60                   # CDBG audit window per OIG / GAO
+
+# --- Matter lifecycle (TENANCY-MODEL §11.2 + §14.4) ----------------------
+# Federal → State → Subrecipient. State pickup deadline drives the
+# ownership_gap alert for the federal-to-state transit window.
+definition_quality: clear
+
+defaults:
+  federal:
+    active_archetypes: [formula_allocation]
+    authority_role: awarding_official
+  state:
+    active_archetypes:
+      - formula_allocation
+      - eligibility_determination
+      - recertification
+      - modification
+    authority_role: state_program_director
+  recipient:
+    active_archetypes:
+      - payment_authorization
+      - eligibility_determination
+      - adverse_action
+    authority_role: certifying_officer
+
+heartbeat:
+  state_pickup_days: 30                  # state must accept + sub-grant
+  state_pickup_severity: high
+  recipient_draw_days: 90                # phantom-subrecipient threshold
+  recipient_draw_severity: medium
+  outcome_rollup_days: 60                # post-closeout reporting

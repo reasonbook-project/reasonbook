@@ -1,0 +1,77 @@
+/* Copyright 2026 Data Visuals LLC */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* =============================================================================
+   integrity-components.css — bespoke @layer components block mapped to the
+   tokens in tailwind.config.ts. Sits between @tailwind components and
+   @tailwind utilities so utilities still win. Requires the component-layer
+   tokens (forensic, ink-inv, ink-inv-2, rule-warm, rule-dark, tint-state,
+   tint-contractor) and --navy = #3162AA. Reuses the existing
+   critical/warning/resolved semantic groups.
+   ============================================================================= */
+
+@layer components {
+
+  /* ---------- eyebrow ---------- */
+  .eyebrow { @apply font-mono text-mono-label uppercase text-ink-muted; }
+  .eyebrow .num { @apply text-navy; }
+
+  /* ---------- buttons ---------- */
+  .btn { @apply inline-flex items-center gap-1.5 font-sans font-semibold text-body px-4 py-2.5 rounded-md cursor-pointer transition; }
+  .btn-primary { @apply btn bg-navy text-white; }
+  .btn-primary:hover { @apply bg-navy-deep; }
+  .btn-ghost { @apply btn bg-transparent text-ink border border-rule; }
+  .btn-ghost:hover { @apply bg-bg; }
+
+  /* ---------- pills / tags ---------- */
+  .pill { @apply text-caption font-medium px-2 py-0.5 rounded-md whitespace-nowrap; }
+  .pill-flag        { @apply pill bg-critical-bg text-critical-text; }
+  .pill-cleared     { @apply pill bg-resolved-bg text-resolved-text; }
+  .pill-fed         { @apply pill bg-navy-soft text-tier-federal; }
+  .pill-state       { @apply pill bg-tint-state text-tier-state; }
+  .pill-contractor  { @apply pill bg-tint-contractor text-tier-contractor; }
+
+  /* ---------- app shell: dark nav ---------- */
+  .nav { @apply bg-forensic text-ink-inv-2 py-4 overflow-y-auto; }
+  .nav-brand { @apply flex items-center gap-2.5 px-4 pb-4 no-underline font-sans font-semibold text-heading-l text-white; }
+  .brand-mark { @apply flex items-center justify-center flex-none w-9 h-9 bg-paper rounded-full;
+                box-shadow: 0 1px 6px rgba(0,0,0,0.28); }
+  .nav-sec { @apply font-mono text-mono-label uppercase text-ink-faint px-4 pt-4 pb-1.5; }
+  .nav-item { @apply flex justify-between items-center px-4 py-2 text-body text-ink-inv-2 cursor-pointer border-l-[3px] border-l-transparent no-underline; }
+  .nav-item:hover { @apply bg-white/5; }
+  .nav-item.active { @apply bg-white/[0.09] text-white border-l-navy font-medium; }
+  .nav-item .idx { @apply font-mono text-caption text-ink-faint; }
+
+  /* ---------- metric card ---------- */
+  .stat { @apply bg-bg rounded-md p-4; }
+  .stat-label { @apply text-mono-label uppercase text-ink-muted; }
+  .stat-num { @apply font-sans text-stat mt-1.5; }
+  .stat-cap { @apply text-body-sm text-ink-faint; }
+
+  /* ---------- plain-language measure card (catalog) ---------- */
+  .measure { @apply bg-paper border border-rule rounded-lg p-4; }
+  .measure-name { @apply text-body font-medium text-navy; }
+  .measure-mean { @apply text-body-sm text-ink-soft mt-1.5; }
+  .measure-thr  { @apply text-body-sm text-ink-muted mt-2; }
+  .measure-tech { @apply font-mono text-caption text-ink-faint mt-2 pt-2 border-t border-rule-soft; }
+
+  /* =============================================================================
+     RECORD SURFACES — same DNA (mono + ledger dots + tier bars), two volumes
+     ============================================================================= */
+  .surface-record      { @apply bg-paper-warm border border-rule-warm rounded-lg p-[18px] text-ink; }
+  .surface-record-dark { @apply bg-forensic border border-rule-dark rounded-lg p-[18px] text-ink-inv-2; }
+
+  .ledger-row { @apply font-mono text-body-sm leading-7; }
+  .ledger-dot { @apply text-cleared; }
+  .tier-bar { @apply pl-2.5 rounded-none border-l-[3px] border-l-rule; }
+  .tier-bar.fed        { @apply border-l-tier-federal; }
+  .tier-bar.state      { @apply border-l-tier-state; }
+  .tier-bar.contractor { @apply border-l-tier-contractor; }
+
+  /* ---------- on-dark context: any control on a dark surface ---------- */
+  .on-dark { @apply text-ink-inv; }
+  .on-dark .btn-ghost { @apply text-ink-inv border-rule-dark bg-transparent; }
+  .on-dark .btn-ghost:hover { @apply bg-white/[0.06]; }
+  .on-dark input, .on-dark select, .on-dark textarea { @apply bg-forensic text-ink-inv border border-rule-dark; }
+  .on-dark a { @apply text-navy; }
+}

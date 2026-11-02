@@ -1,0 +1,197 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# Signal vocabulary — cross-cutting signal-pattern declarations
+#
+# Every signal DP raises is an *instance* of one of the AlertCategories
+# declared here. The Semantic Catalog reads this file so an examiner
+# asking "what signals can DP raise, and what does each mean?" gets the
+# authoritative answer.
+#
+# Sources correspond to the three signal-engine families the seed emits:
+#   - flow_graph            — fund-flow-graph analysis
+#   - fraud_risk_screening  — federal-exclusion / do-not-pay match
+#   - identity              — identity-resolution disagreements
+#
+# Every seed-emitted alert's `signal_ref.kind` MUST resolve against one
+# of the ids below (validated at seed time). If a new signal type is
+# added, declare it here first, then wire the seed / detector.
+
+workflow:
+  id: 00-signal-vocabulary
+  name: Signal vocabulary
+  full_name: Signal vocabulary (catalog)
+  description: >
+    Cross-cutting registry of every signal pattern DP raises. Not a
+    business workflow — read by the Semantic Catalog as the authoritative
+    definition set for signal instances the detection engines emit.
+  version: "1.0"
+  vertical: federal_program_integrity
+  icon: alert-hexagon
+  color: "#7C2D12"
+  apex_contributing: false
+  is_apex: false
+
+# ─── Alert categories ──────────────────────────────────────────────────────
+# Catalog facets per DESIGN-SPEC-semantic-catalog.md.
+# Note on facet vocabulary:
+#   - severity is constrained to {critical, warning, positive, informational}
+#     by the catalog schema — the alerts table uses a wider {critical, high,
+#     medium, low} set. Map high/medium to warning at declaration time; the
+#     runtime severity on each alert instance is preserved on the row.
+#   - tier uses cross_tier (underscore) per the catalog schema.
+#   - domain values are limited to the catalog schema's closed set; the
+#     closest fit is chosen for each family (fraud_risk → payment_integrity
+#     for exclusions, identity → integrity for identity conflicts).
+alert_categories:
+
+  # ── flow_graph family ────────────────────────────────────────────────
+  - id: tier_skip
+    name: Tier-skip
+    description: "Money moved from one tier directly to a deeper tier, bypassing an expected pass-through."
+    meaning: "The fund-flow graph shows an award reached a sub-recipient without passing through the state / pass-through tier that the program's tenancy model requires."
+    why_it_matters: "Skipping the state tier breaks the chain of custody, disables state-level program oversight, and typically indicates either a data ingest gap or an actual bypass."
+    owner: "Program integrity officer"
+    who_watches: agency_head
+    tier: cross_tier
+    domain: payment_integrity
+    severity: warning
+    plain_thresholds: "fires when a federal→recipient edge exists without an intervening state node"
+    icon: git-fork
+    color: "#B45309"
+
+  - id: fund_diversion
+    name: Fund diversion
+    description: "Aggregate federal-share flow crossed a diversion threshold at a specific downstream node."
+    meaning: "A concentration of federal funds arrived at one downstream org that exceeds the historical or programmatic norm — the shape looks like diversion, not routine allocation."
+    why_it_matters: "The graph shape is the leading indicator for large-scale diversion cases; concentration precedes prosecution."
+    owner: "Program integrity officer"
+    who_watches: oig
+    tier: cross_tier
+    domain: payment_integrity
+    severity: critical
+    plain_thresholds: "aggregate downstream flow exceeds the program's diversion threshold"
+    icon: alert-octagon
+    color: "#991B1B"
+
+  - id: phantom_subrecipient
+    name: Phantom subrecipient
+    description: "A subrecipient node received funds but shows no downstream evidence of the program activity the funds were awarded for."
+    meaning: "The recipient took the money but the fund-flow graph and evidence stream show no downstream activity — no beneficiaries, no service delivery, no draw-down."
+    why_it_matters: "Phantom sub-recipients are the archetypal fraud pattern in nutrition, workforce, and rental-assistance programs."
+    owner: "Program integrity officer"
+    who_watches: oig
+    tier: recipient
+    domain: subrecipient_oversight
+    severity: warning
+    plain_thresholds: "recipient node with award but no draw-down or service record within the program's threshold window"
+    icon: ghost
+    color: "#7C2D12"
+
+  - id: benefit_stacking
+    name: Benefit stacking
+    description: "The same beneficiary appears in two or more overlapping federal programs beyond what the programs' rules permit."
+    meaning: "One entity is drawing benefits from concurrent programs whose statutory eligibility rules exclude the overlap."
+    why_it_matters: "Benefit stacking is a common improper-payment class flagged in single-audit findings; catching it upstream prevents recovery-collection cost."
+    owner: "Program integrity officer"
+    who_watches: agency_head
+    tier: cross_tier
+    domain: eligibility
+    severity: warning
+    plain_thresholds: "beneficiary appears in ≥ 2 programs whose eligibility rules exclude concurrency"
+    icon: layers
+    color: "#A16207"
+
+  # ── fraud_risk_screening family ──────────────────────────────────────
+  - id: leie_exclusion
+    name: LEIE exclusion match
+    description: "A federal award recipient matches an entity on the HHS OIG List of Excluded Individuals and Entities (LEIE)."
+    meaning: "The recipient (or an affiliated principal) is on the HHS OIG exclusion list — payments to them from federal health-care programs are prohibited."
+    why_it_matters: "Payment to a LEIE-excluded entity is a per se improper payment under 42 CFR 1001 and 2 CFR 180; must halt before disbursement."
+    owner: "Certifying officer"
+    who_watches: agency_head
+    tier: cross_tier
+    domain: payment_integrity
+    severity: critical
+    plain_thresholds: "exact UEI, DUNS, or SSN match against the LEIE snapshot"
+    icon: ban
+    color: "#991B1B"
+
+  - id: sam_gov_exclusion
+    name: SAM.gov exclusion match
+    description: "A federal award recipient matches an active exclusion record on SAM.gov."
+    meaning: "The recipient is subject to a SAM.gov active exclusion — federal award prohibitions apply per 2 CFR 180."
+    why_it_matters: "Awarding to a SAM.gov-excluded entity violates the government-wide suspension and debarment rules."
+    owner: "Awarding official"
+    who_watches: agency_head
+    tier: cross_tier
+    domain: payment_integrity
+    severity: warning
+    plain_thresholds: "UEI match against SAM.gov Active Exclusions on the day of the check"
+    icon: shield-x
+    color: "#A16207"
+
+  - id: treasury_dnp_match
+    name: Treasury Do Not Pay match
+    description: "A payee matches an entity on the Treasury Do Not Pay working system (deceased, debarred, or judgment)."
+    meaning: "The payee record cross-hits an active Do Not Pay indicator — deceased individual, debarred entity, or unresolved judgment / delinquent debt."
+    why_it_matters: "Do Not Pay match halts the payment authorization; ignoring one is an audit finding under the Improper Payments Elimination and Recovery Improvement Act (IPERIA)."
+    owner: "Certifying officer"
+    who_watches: agency_head
+    tier: cross_tier
+    domain: payment_integrity
+    severity: critical
+    plain_thresholds: "positive match against any of the DNP source lists (DMF, SAM Exclusions, CAIVRS, Treasury debt)"
+    icon: hand-stop
+    color: "#991B1B"
+
+  # ── identity family ──────────────────────────────────────────────────
+  - id: duplicate_claim
+    name: Duplicate claim — same identity, two states
+    description: "The same identity (SSN, TIN, or biometric key) appears in two or more state benefit rolls where concurrency is not permitted."
+    meaning: "One person is drawing the same benefit from two states — the identity-resolution pipeline flagged the collision for adjudication."
+    why_it_matters: "Duplicate enrollment is one of the highest-volume improper-payment classes in Medicaid, SNAP, and unemployment insurance."
+    owner: "Program integrity officer"
+    who_watches: agency_head
+    tier: cross_tier
+    domain: integrity
+    severity: warning
+    plain_thresholds: "same normalised identity key present in ≥ 2 state rolls in overlapping periods"
+    icon: users
+    color: "#A16207"
+
+  - id: ssn_multiple_claimants
+    name: SSN tied to multiple claimants
+    description: "One SSN is associated with two or more distinct claimant records within a single program."
+    meaning: "A single SSN is being used by more than one person to claim benefits — either identity theft or coordinated fraud."
+    why_it_matters: "SSN-multiple-claimant is a common fraud vector in unemployment insurance and pandemic-era assistance programs."
+    owner: "Program integrity officer"
+    who_watches: oig
+    tier: cross_tier
+    domain: integrity
+    severity: warning
+    plain_thresholds: "one SSN linked to ≥ 2 claimant records across the program"
+    icon: user-x
+    color: "#991B1B"
+
+# ─── SLA (required by schema) ─────────────────────────────────────────────
+# Signal vocabulary is a definition-only workflow — SLA values are
+# nominal. Runtime SLAs come from the business workflow that promotes a
+# signal into a Review, not from this file.
+sla:
+  default_response_hours: 168        # 7 days nominal — never actually used at runtime
+  warning_window_hours: 48
+  critical_window_hours: 24
+  business_hours_start: "08:00"
+  business_hours_end: "17:00"
+  timezone: "America/New_York"
+  holidays: []
+
+# ─── Ownership (required by schema) ───────────────────────────────────────
+# Signal vocabulary has no runtime owner — declared for schema conformance.
+ownership:
+  primary_role:    program_integrity_officer
+  backup_role:     awarding_official
+  escalation_role: agency_head
+
+# ─── Overridable keys (empty — this workflow is read-only vocabulary) ──
+overridable_keys: {}

@@ -1,0 +1,157 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Archetype (Tier 2): modification
+# Authority-gated changes to an existing award or benefit (no-cost extension,
+# supplement, scope change, benefit increase/decrease). Forward-flow, one
+# Decision per modification request. Conforms to archetype.schema.yaml.
+# =============================================================================
+
+schema_version: "1.0"
+
+archetype:
+  id: modification
+  name: Modification
+  description: >
+    Change to an existing award or benefit, authorized under delegation. The
+    decision basis is an authorization check (does the requesting party
+    meet the change criteria within the delegated authority's limits), not
+    merit review or rule re-evaluation.
+  family: [grant]
+  flow: forward
+  decision_basis: authorization
+  promotes: every_case
+
+ledger:
+  records: all_determinations
+  reconstructable: true
+promotion_triggers: [override, adverse_action, appeal, fraud_flag]
+
+flow_template:
+  tiers: [awarding_agency, recipient, subrecipient]
+  required_edges: [awards]
+  optional_edges: [passes_through]
+  edge_types: [awards, passes_through]
+
+stages:
+  - id: request
+    maps_to: signal
+    label: Modification request
+    gate: none
+    decision_basis_step: false
+    required_evidence: [request_form, prior_award_record]
+    sla_hint_hours: 72
+  - id: scope_review
+    maps_to: owner
+    label: Scope review
+    gate: none
+    decision_basis_step: false
+    required_evidence: [budget_diff, scope_diff, justification]
+    sla_hint_hours: 168
+  - id: authorization_check
+    maps_to: decision
+    label: Authorization check
+    gate: none
+    decision_basis_step: true            # delegation matrix applied here
+    required_evidence: [delegation_check, limit_check]
+    sla_hint_hours: 120
+  - id: authority_decision
+    maps_to: action
+    label: Authority decision
+    gate: authority
+    decision_basis_step: false
+    required_evidence: [modification_recommendation]
+    sla_hint_hours: 240
+  - id: amendment
+    maps_to: outcome
+    label: Amendment issued or denial
+    gate: none
+    decision_basis_step: false
+    required_evidence: [amendment_or_denial_notice]
+    sla_hint_hours: 120
+
+roles:
+  - id: requestor
+    label: Requestor
+    authority: false
+  - id: program_officer
+    label: Program officer
+    authority: false
+  - id: approving_official
+    label: Approving official
+    authority: true
+  - id: oversight
+    label: Oversight / OIG
+    authority: false
+
+authority:
+  delegation_ref: shared/authority.yaml
+  gated_transitions: [authority_decision]
+
+evidence:
+  kinds:
+    - request_form
+    - prior_award_record
+    - budget_diff
+    - scope_diff
+    - justification
+    - delegation_check
+    - limit_check
+    - modification_recommendation
+    - amendment_or_denial_notice
+  attachments: true
+
+overrides:
+  allowed: true                          # exceed delegation w/ higher-level sign-off
+  rationale_required: true
+  outcome_alignment_check: true
+
+reconstructability:
+  standard_ref: shared/reconstructability.yaml
+  retention_months: 24
+
+outcomes:
+  - id: approved
+    label: Modification approved
+    terminal: true
+  - id: denied
+    label: Modification denied
+    terminal: true
+  - id: withdrawn
+    label: Withdrawn
+    terminal: true
+
+events:
+  - request_received
+  - scope_reviewed
+  - delegation_evaluated
+  - authority_decided
+  - override_recorded
+  - amendment_issued
+
+data_sources:
+  - sam_gov_entity
+  - sam_exclusions
+  - hhs_leie
+
+profile_extensible:
+  - stages[].label
+  - stages[].sla_hint_hours
+  - roles[].label
+  - decision_logic
+  - vocabulary
+  - data_sources
+  - reconstructability.retention_months
+
+profile_required:
+  - decision_logic
+  - authority.delegation_assignment
+  - vocabulary
+  - role_assignments
+
+# --- Upstream review (TENANCY-MODEL §5) -----------------------------------
+# Modifications change the terms of a prior award — upstream tier signs.
+upstream_review:
+  on_modification: gate
+  # on_promote, on_outcome, on_adverse_action, on_closeout default to notify.
+

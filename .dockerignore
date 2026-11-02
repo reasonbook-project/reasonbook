@@ -1,0 +1,30 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+.git
+.gitignore
+.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+tests
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+secrets
+*-credentials.txt
+web/node_modules
+web/dist
+web/.vite
+reasonbook/static/web
+build-autogen.db
+seedtest.db
+upgrade-test.db
+ck.db
+logo
+docs
+*.md
+!README.md

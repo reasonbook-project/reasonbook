@@ -1,0 +1,86 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Program profile (Tier 3): nih-no-cost-extension
+# NIH no-cost extension (NCE) — modification archetype reference profile.
+# Lets a grantee extend the project period without additional funds.
+# =============================================================================
+
+schema_version: "1.0"
+
+profile:
+  id: nih-no-cost-extension
+  name: NIH no-cost extension
+  display_name: NIH no-cost extension
+  binds_archetype: modification
+  agency: NIH
+  awarding_agency: NIH — Office of Extramural Research
+  federal_archetype: modification
+
+# --- profile_required ---------------------------------------------------
+
+decision_logic:
+  type: auth_check
+  delegation_check:
+    first_nce_under_12_months: grantee_initiated      # 45 CFR 75.308(d)
+    subsequent_or_over_12_months: agency_approved     # IC approval required
+  limit_check:
+    max_total_extension_months: 24
+    must_not_change_scope: true
+    must_not_change_pi: true                          # PI change is a different mod
+
+authority:
+  delegation_assignment:
+    approving_official_role: nih_grants_management_officer
+    matrix: shared/authority.yaml
+    citation: 45 CFR 75.308 / NIH GPS 8.1.1.1
+
+role_assignments:
+  requestor: principal_investigator
+  program_officer: nih_program_officer
+  approving_official: nih_grants_management_officer
+  oversight: nih_oig
+
+vocabulary:
+  request: prior_approval_request
+  scope_review: scope_and_budget_review
+  authorization_check: nce_authority_check
+  authority_decision: gmo_decision
+  amendment: notice_of_award_amendment
+
+# --- profile_extensible -------------------------------------------------
+
+stage_overrides:
+  authority_decision:
+    sla_hint_hours: 480                  # NIH commits to 30 business days
+    label: GMO decision
+
+data_sources:
+  - sam_gov_entity
+  - sam_exclusions
+  - hhs_leie
+  - eRA_commons                          # NIH-specific
+  - prior_award_record
+
+reconstructability:
+  retention_months: 36
+
+# --- Matter lifecycle (TENANCY-MODEL §11.2 + §14.4) ----------------------
+# NCE runs on top of a parent NIH-R01 award; the recipient initiates,
+# federal authorizes. No state tier.
+definition_quality: clear
+
+defaults:
+  federal:
+    active_archetypes: [modification]
+    authority_role: awarding_official
+  state:
+    active_archetypes: []
+    authority_role: null
+  recipient:
+    active_archetypes: [modification]
+    authority_role: certifying_officer
+
+heartbeat:
+  outcome_rollup_days: 30                # post-extension reporting
+  outcome_rollup_severity: medium

@@ -1,0 +1,59 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+
+# Default: one service (reasonbook) backed by a SQLite file on a volume.
+# Ingestion runs in-process (APScheduler) inside the single container.
+#
+#   docker compose up --build
+#     -> single SQLite-backed container at http://localhost:8000
+#
+#   docker compose --profile postgres up --build
+#     -> also starts PostgreSQL; set REASONBOOK_DATABASE_URL at the service
+#        below to the postgres URL (already wired via the profile example).
+
+services:
+  reasonbook:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - reasonbook-data:/data          # SQLite DB + local attachments live here
+    environment:
+      # SQLite by default. To use the optional postgres service, comment the
+      # SQLite line and uncomment the postgres URL below (and start with the
+      # `postgres` profile).
+      REASONBOOK_DATABASE_URL: "sqlite:////data/reasonbook.db"
+      # REASONBOOK_DATABASE_URL: "postgresql+psycopg://reasonbook:reasonbook@postgres:5432/reasonbook"
+      REASONBOOK_ATTACHMENT_LOCAL_ROOT: "/data/attachments"
+      # REQUIRED in production — no default ships in code. Generate one with:
+      #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+      REASONBOOK_SECRET_KEY: "${REASONBOOK_SECRET_KEY:-}"
+      # Optional: first-run admin bootstrap (password printed once to logs).
+      REASONBOOK_ADMIN_EMAIL: "${REASONBOOK_ADMIN_EMAIL:-}"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # OPTIONAL — only started with `--profile postgres`.
+  postgres:
+    image: postgres:16
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: reasonbook
+      POSTGRES_PASSWORD: reasonbook
+      POSTGRES_DB: reasonbook
+    volumes:
+      - reasonbook-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reasonbook"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  reasonbook-data:
+  reasonbook-pg:

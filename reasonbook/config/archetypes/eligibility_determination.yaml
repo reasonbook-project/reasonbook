@@ -1,0 +1,160 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Archetype (Tier 2): eligibility_determination
+# Individual, rule-based entitlement determinations (SNAP, SSDI, Medicaid,
+# Pell). High volume. Conforms to archetype.schema.yaml.
+# =============================================================================
+
+schema_version: "1.0"
+
+archetype:
+  id: eligibility_determination
+  name: Eligibility determination
+  description: >
+    Rule-based determination of an individual's eligibility and benefit level.
+    High volume: most cases auto-resolve and are recorded but not wrapped in a
+    governed Decision unless a trigger fires.
+  family: [entitlement]
+  flow: forward
+  decision_basis: eligibility_rules
+  promotes: on_trigger
+
+ledger:
+  records: all_determinations          # every case, always
+  reconstructable: true
+promotion_triggers: [override, adverse_action, appeal, sample, fraud_flag]
+
+flow_template:
+  tiers: [awarding_agency, pass_through, beneficiary]   # fed funds, state administers
+  required_edges: [awards, disburses_to]                # fed->state, state->beneficiary
+  optional_edges: [passes_through]
+  edge_types: [awards, passes_through, disburses_to]
+
+stages:
+  - id: intake
+    maps_to: signal
+    label: Application intake
+    gate: none
+    decision_basis_step: false
+    required_evidence: [application, identity_claim]
+    sla_hint_hours: 48
+  - id: verification
+    maps_to: owner
+    label: Verification
+    gate: none
+    decision_basis_step: false
+    required_evidence: [identity_verification, income_verification, exclusion_check]
+    sla_hint_hours: 240
+  - id: rule_evaluation
+    maps_to: decision
+    label: Eligibility rule evaluation
+    gate: none                         # routine auto-eval; no human gate
+    decision_basis_step: true          # compositional ruleset applied here
+    required_evidence: [ruleset_result]
+    sla_hint_hours: 24
+  - id: determination
+    maps_to: action
+    label: Determination
+    gate: conditional                  # authority gate ONLY when promoted
+    decision_basis_step: false
+    required_evidence: [benefit_calc]
+    sla_hint_hours: 24
+  - id: benefit_outcome
+    maps_to: outcome
+    label: Benefit outcome
+    gate: none
+    decision_basis_step: false
+    required_evidence: [notice]
+    sla_hint_hours: 48
+
+roles:
+  - id: claimant
+    label: Claimant
+    authority: false
+  - id: caseworker
+    label: Caseworker
+    authority: false
+  - id: supervisor
+    label: Supervisor
+    authority: true                    # passes the conditional gate on promotion
+  - id: oversight
+    label: Oversight / OIG
+    authority: false
+
+authority:
+  delegation_ref: shared/authority.yaml
+  gated_transitions: [determination]   # only enforced when promoted
+
+evidence:
+  kinds:
+    - application
+    - identity_claim
+    - identity_verification
+    - income_verification
+    - exclusion_check
+    - ruleset_result
+    - benefit_calc
+    - notice
+  attachments: true
+
+overrides:
+  allowed: true                        # caseworker departs from auto-result
+  rationale_required: true
+  outcome_alignment_check: true        # override is itself a promotion_trigger
+
+reconstructability:
+  standard_ref: shared/reconstructability.yaml
+  retention_months: 24
+
+outcomes:
+  - id: eligible
+    label: Eligible
+    terminal: true
+  - id: ineligible
+    label: Ineligible
+    terminal: true                     # contestable -> routes to adverse_action archetype
+  - id: pending_info
+    label: Pending information
+    terminal: false
+
+events:
+  - application_received
+  - verification_completed
+  - ruleset_evaluated
+  - determination_made
+  - override_recorded
+  - promoted_to_decision               # emitted when a trigger fires
+  - disbursement_authorized
+
+data_sources:
+  - ssa_ssn_verification
+  - irs_4506c
+  - state_eligibility_db
+  - treasury_do_not_pay
+  - hhs_leie
+
+# --- Extension contract ----------------------------------------------------
+profile_extensible:
+  - stages[].label
+  - stages[].sla_hint_hours              # tighten only
+  - roles[].label
+  - decision_logic                       # eligibility ruleset
+  - vocabulary
+  - data_sources
+  - reconstructability.retention_months  # extend only
+
+profile_required:
+  - decision_logic
+  - authority.delegation_assignment
+  - vocabulary
+  - role_assignments
+
+# --- Upstream review (TENANCY-MODEL §5) -----------------------------------
+# High-volume entitlement determinations; only adverse_action gates
+# upstream (debarment / suspension / recoupment touches the chain).
+# Modifications and closeout are state-tier business, no federal sign-off.
+upstream_review:
+  on_adverse_action: gate
+  # on_promote, on_outcome, on_modification, on_closeout default to notify.
+

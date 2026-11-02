@@ -1,0 +1,99 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Program profile (Tier 3): snap
+# Supplemental Nutrition Assistance Program. Reference profile for the
+# eligibility_determination archetype (high-volume on_trigger).
+# =============================================================================
+
+schema_version: "1.0"
+
+profile:
+  id: snap
+  name: Supplemental Nutrition Assistance Program
+  display_name: SNAP — Supplemental Nutrition Assistance Program
+  binds_archetype: eligibility_determination
+  agency: USDA-FNS
+  awarding_agency: USDA — Food and Nutrition Service
+  federal_archetype: formula_allocation
+
+# --- profile_required ---------------------------------------------------
+
+decision_logic:
+  type: eligibility_ruleset
+  ruleset_version: "2026.06"
+  composition:
+    - id: household_composition
+    - id: gross_income_test            # ≤ 130% FPL (most states)
+    - id: net_income_test              # ≤ 100% FPL
+    - id: asset_test                   # categorical-eligible state overrides
+    - id: work_requirement             # ABAWD where applicable
+    - id: citizenship_status
+  benefit_calculation:
+    method: thrifty_food_plan_minus_30pct_net_income
+    cap: max_allotment_by_household_size
+
+authority:
+  delegation_assignment:
+    approving_official_role: state_snap_director
+    matrix: shared/authority.yaml
+    citation: 7 CFR 273 / state SNAP delegation order
+
+role_assignments:
+  claimant: snap_applicant
+  caseworker: state_eligibility_worker
+  supervisor: state_snap_supervisor
+  oversight: usda_fns_oig
+
+vocabulary:
+  intake: snap_application
+  verification: eligibility_verification
+  rule_evaluation: snap_eligibility_run
+  determination: certification
+  benefit_outcome: ebt_authorization
+
+# --- profile_extensible -------------------------------------------------
+
+stage_overrides:
+  verification:
+    sla_hint_hours: 720                  # statutory 30 days for non-expedited
+  rule_evaluation:
+    label: SNAP rule evaluation
+
+data_sources:
+  - ssa_ssn_verification
+  - irs_4506c
+  - state_eligibility_db
+  - treasury_do_not_pay
+  - hhs_leie
+  - usda_quality_control_sample        # QC sample is a promotion_trigger
+
+reconstructability:
+  retention_months: 36                   # FNS audit window
+
+# --- Matter lifecycle (TENANCY-MODEL §11.2 + §14.4) ----------------------
+# Federal admin funds flow to State agencies; State runs the eligibility
+# determinations. Households are the recipients but the SNAP recipient
+# tier is effectively a household, not an organization — no contractor-
+# style draw heartbeat. Outcome rollup is the state's QC sample.
+definition_quality: clear
+
+defaults:
+  federal:
+    active_archetypes: [formula_allocation]
+    authority_role: awarding_official
+  state:
+    active_archetypes:
+      - formula_allocation
+      - eligibility_determination
+      - recertification
+    authority_role: state_program_director
+  recipient:
+    active_archetypes: []                # households, not organizations
+    authority_role: null
+
+heartbeat:
+  state_pickup_days: 14                  # tight pickup — SNAP admin runs continuously
+  state_pickup_severity: high
+  outcome_rollup_days: 30                # state QC sample reporting cadence
+  outcome_rollup_severity: medium

@@ -1,0 +1,92 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# =============================================================================
+# Program profile (Tier 3): treasury-disbursement
+# Treasury disbursement authorization check (Do Not Pay matching + exclusion
+# screening). Reference profile for the payment_authorization archetype.
+# =============================================================================
+
+schema_version: "1.0"
+
+profile:
+  id: treasury-disbursement
+  name: Treasury disbursement authorization
+  display_name: Treasury disbursement authorization
+  binds_archetype: payment_authorization
+  agency: Treasury-BFS                   # Bureau of the Fiscal Service
+  awarding_agency: U.S. Treasury — Bureau of the Fiscal Service
+  federal_archetype: payment_authorization
+
+# --- profile_required ---------------------------------------------------
+
+decision_logic:
+  type: auth_check
+  checks:
+    - id: do_not_pay
+      source: treasury_do_not_pay
+      block_on: match
+    - id: sam_exclusion
+      source: sam_exclusions
+      block_on: active_exclusion
+    - id: hhs_leie
+      source: hhs_leie
+      block_on: list_match                # for HHS-paying agencies
+    - id: term_compliance
+      source: prior_award_record
+      block_on: noncompliance_flag
+  resolution: all_must_pass
+
+authority:
+  delegation_assignment:
+    approving_official_role: agency_certifying_officer
+    matrix: shared/authority.yaml
+    citation: 31 USC 3528 / Treasury Financial Manual
+
+role_assignments:
+  payee: payment_recipient
+  payment_clerk: agency_payment_clerk
+  certifying_officer: agency_certifying_officer
+  oversight: treasury_oig
+
+vocabulary:
+  payment_request: payment_request
+  check_run: pre_payment_screening
+  authorization_evaluation: screening_evaluation
+  disbursement: certified_disbursement
+  payment_outcome: payment_status
+
+# --- profile_extensible -------------------------------------------------
+
+stage_overrides:
+  check_run:
+    sla_hint_hours: 1                    # screening runs within an hour
+  disbursement:
+    label: Certified disbursement (post-screen)
+
+data_sources:
+  - treasury_do_not_pay
+  - sam_exclusions
+  - hhs_leie
+  - gsa_sam
+  - prior_award_record
+
+reconstructability:
+  retention_months: 84                   # IPERA + Treasury audit overlap
+
+# --- Matter lifecycle (TENANCY-MODEL §11.2 + §14.4) ----------------------
+# Treasury disbursement is the pre-payment screen; runs federally with no
+# tier transit. No heartbeats — payment is the action, not the destination.
+definition_quality: clear
+
+defaults:
+  federal:
+    active_archetypes: [payment_authorization]
+    authority_role: certifying_officer
+  state:
+    active_archetypes: []
+    authority_role: null
+  recipient:
+    active_archetypes: []
+    authority_role: null
+
+heartbeat: {}                            # federal-only; no transit clocks

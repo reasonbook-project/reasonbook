@@ -1,0 +1,903 @@
+# Copyright 2026 Data Visuals LLC
+# SPDX-License-Identifier: Apache-2.0
+# Oversight — Agency & oversight (Workflow 10)
+#
+# Post-pivot framing: the oversight tier is no longer "C-suite + board of directors"
+# for a financial institution. In Reasonbook's federal context, oversight covers
+# agency leadership + statutory oversight (Inspector General, internal audit
+# committee) + the response surface for external oversight (GAO, OMB,
+# Congressional committees).
+#
+# Oversight decisions move appropriations, set fraud-loss tolerance, respond to
+# IG/GAO findings, prepare Congressional inquiry responses, and authorize
+# significant program-design changes — with operational evidence drawn from
+# the seven archetypes (competitive_award, formula_allocation,
+# eligibility_determination, recertification, modification, adverse_action,
+# payment_authorization).
+
+workflow:
+  id: 10-oversight
+  name: Oversight
+  full_name: Agency & oversight
+  description: >
+    Agency-leadership and oversight-committee decisions, with operational
+    evidence drawn from the seven program-integrity archetypes. Oversight is
+    where the agency commits to appropriations strategy, fraud-loss
+    tolerance, IG-finding remediation, GAO/Congressional response posture,
+    significant program-design changes, and the governance program itself.
+  version: "2.0"
+  vertical: federal_program_integrity
+  icon: chart-pyramid
+  color: "#042C53"           # deep navy — oversight uses the editorial weight color
+  oversight_contributing: false   # oversight doesn't reference itself
+  is_oversight: true              # platform discriminator (exactly one workflow)
+  enterprise_only: true      # entitlement gated to Enterprise tier
+
+# ─── Entities ──────────────────────────────────────────────────────────────
+entities:
+  oversight_decision:
+    display_name: Oversight decision
+    description: An agency-leadership or oversight-tier decision the agency is making or has made.
+  oversight_evidence_link:
+    display_name: Oversight evidence link
+    description: Many-to-many link from oversight decision to operational determinations and program activity serving as evidence.
+  oversight_cycle:
+    display_name: Oversight cycle
+    description: >
+      A scheduled or triggered review window — IG audit cycle, internal
+      audit committee meeting, OMB reporting cycle, appropriations cycle,
+      or a Congressional inquiry response window — that contains a set of
+      oversight decisions.
+
+# ─── Decision domains ──────────────────────────────────────────────────────
+# Eight federal-tier domains plus governance_improvement. ``typical_evidence_archetypes``
+# replaces the legacy ``typical_evidence_workflows`` — the operational evidence
+# now flows from archetype-level activity, not the retired banking workflows.
+decision_domains:
+  - { id: appropriations_and_obligations, name: Appropriations & obligations,       primary_owner_role: cfo,           secondary_owner_roles: [agency_head, coo],            typical_evidence_archetypes: [formula_allocation, competitive_award, payment_authorization],     description: "Apportionment, obligations, anti-deficiency posture, appropriations alignment." }
+  - { id: program_portfolio,              name: Program portfolio,                  primary_owner_role: agency_head,   secondary_owner_roles: [cfo, cpio],                   typical_evidence_archetypes: [competitive_award, formula_allocation, eligibility_determination], description: "Program additions, sunsets, mergers, and significant scope changes at the agency level." }
+  - { id: fraud_loss_tolerance,           name: Fraud-loss tolerance,               primary_owner_role: cpio,          secondary_owner_roles: [agency_head, cco],            typical_evidence_archetypes: [payment_authorization, eligibility_determination, adverse_action], description: "The agency's accepted level of fraud / improper-payment loss in service of program throughput; tolerance limits and review triggers." }
+  - { id: congressional_and_regulatory_posture, name: Congressional & regulatory posture, primary_owner_role: cco,     secondary_owner_roles: [agency_head, gc, inspector_general], typical_evidence_archetypes: [adverse_action, competitive_award, formula_allocation],        description: "Responses to GAO findings, OIG audits, OMB guidance, and Congressional inquiries. Strategic positioning vs. external oversight." }
+  - { id: subrecipient_and_vendor_oversight, name: Subrecipient & vendor oversight, primary_owner_role: cpio,         secondary_owner_roles: [coo, cco],                    typical_evidence_archetypes: [formula_allocation, payment_authorization, adverse_action],       description: "Pass-through and vendor management strategy: oversight policy, debarment posture, single-audit follow-up." }
+  - { id: program_design,                 name: Program design,                     primary_owner_role: agency_head,   secondary_owner_roles: [cpio, cfo],                   typical_evidence_archetypes: [eligibility_determination, recertification, modification],         description: "Material changes to program rules, eligibility framing, delivery channels, or recertification cadence." }
+  - { id: technology_and_systems,         name: Technology & systems,               primary_owner_role: coo,           secondary_owner_roles: [agency_head, cpio],           typical_evidence_archetypes: [payment_authorization, eligibility_determination],                 description: "Major IT investments, platform replacements, identity-resolution infrastructure, integration with Treasury / SAM / IG case-management systems." }
+  - { id: governance_and_organization,    name: Governance & organization,          primary_owner_role: agency_head,   secondary_owner_roles: [gc, audit_committee_chair],   typical_evidence_archetypes: [],                                                                 description: "Agency org chart, committee restructuring, delegation policy, executive succession, oversight governance." }
+  # Governance improvement — maturity-model-style facet maturation. Kept from the
+  # legacy carry-forward because the facet model (ownership, timeliness,
+  # reconstructability, override-discipline, authority, oversight-linkage)
+  # translates cleanly to federal program integrity.
+  - { id: governance_improvement,         name: Governance improvement,             primary_owner_role: cpio,          secondary_owner_roles: [agency_head, cco],            typical_evidence_archetypes: [],                                                                 description: "Authorization, advancement reviews, and scope adjustments for the agency's own governance program (maturity-model-style facets)." }
+
+# ─── Evidence roles ────────────────────────────────────────────────────────
+# How a piece of operational activity (a determination, a ledger row, an
+# alert disposition) counts as evidence for an oversight decision. Roles unchanged
+# from the legacy taxonomy — the framing translates cleanly federal-side.
+evidence_roles:
+  - { id: primary_evidence,                name: Primary evidence,                description: "Central data point supporting the oversight decision.",                  typical_count_per_oversight_decision: "1-2" }
+  - { id: supporting_evidence,             name: Supporting evidence,             description: "Corroborates or expands on the primary evidence.",                  typical_count_per_oversight_decision: "2-5" }
+  - { id: risk_concentration_evidence,     name: Risk concentration evidence,     description: "Documents a fraud / improper-payment pattern relevant to the decision.", typical_count_per_oversight_decision: "0-3" }
+  - { id: regulatory_alignment_evidence,   name: Regulatory alignment evidence,   description: "Documents statutory or regulatory positioning relevant to the decision.", typical_count_per_oversight_decision: "0-2" }
+  - { id: outcome_evidence,                name: Outcome evidence,                description: "Realised outcome of an earlier strategic direction.",               typical_count_per_oversight_decision: "0-3", constraint: "operational_decision must have outcome_recorded_at" }
+  - { id: counter_evidence,                name: Counter-evidence,                description: "Data that complicates or qualifies the oversight decision.",             typical_count_per_oversight_decision: "0-2" }
+
+# ─── Alert categories ──────────────────────────────────────────────────────
+# Catalog facets per DESIGN-SPEC-semantic-catalog.md.
+alert_categories:
+  - id: oversight_cycle_approaching
+    name: Oversight cycle approaching
+    description: "An oversight cycle (IG audit, committee meeting, OMB reporting window) opens within the configured horizon."
+    meaning: "An oversight cycle window is opening soon — prep alerts to chair / IG / staff."
+    why_it_matters: "Misses on cycle prep cascade into late dossiers and committee re-reads."
+    owner: "Chief of Staff"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    severity: informational
+    plain_thresholds: "fires inside the cycle-warning window"
+    icon: calendar
+    color: "#185FA5"
+  - id: strategic_threshold_breach
+    name: Strategic threshold breach
+    description: "An operational metric has crossed a strategic-review threshold."
+    meaning: "An operational metric crossed the threshold that requires apex-level review."
+    why_it_matters: "These are the metrics agency leadership has pre-committed to act on."
+    owner: "Agency head"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    severity: critical
+    plain_thresholds: "critical — metric breaches policy threshold"
+    icon: alert-triangle
+    color: "#A32D2D"
+  - id: external_oversight_trigger
+    name: External oversight trigger
+    description: "A GAO finding, OIG audit, OMB guidance, or Congressional inquiry has surfaced an oversight decision need."
+    meaning: "GAO / OIG / OMB / Congressional staff have surfaced something requiring a response."
+    why_it_matters: "Response timelines from these triggers are externally measured."
+    owner: "Oversight liaison"
+    who_watches: oig
+    tier: federal
+    domain: oversight_response
+    severity: critical
+    plain_thresholds: "critical — external response timeline starts"
+    icon: bell
+    color: "#A32D2D"
+  - id: stale_evidence
+    name: Oversight evidence aging
+    description: "An open oversight decision has linked operational evidence past staleness."
+    meaning: "Evidence behind an open oversight decision has aged past the staleness window."
+    why_it_matters: "Stale evidence weakens defensibility under audit."
+    owner: "Decision owner"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    severity: warning
+    plain_thresholds: "warns when evidence age > staleness threshold"
+    icon: clock
+    color: "#BA7517"
+  - id: committee_endorsement_pending
+    name: Committee endorsement pending
+    description: "Oversight decision was decided by an executive but not yet endorsed by the audit committee."
+    meaning: "Decided by an executive, but the audit committee hasn't endorsed yet."
+    why_it_matters: "The contemporaneous-record standard expects committee endorsement near-term."
+    owner: "Audit committee chair"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    severity: informational
+    plain_thresholds: "fires after executive decided_at + endorsement window"
+    icon: gavel
+    color: "#185FA5"
+  # Floor regression alert — kept from the governance roadmap. Composite
+  # floor dropping a level auto-surfaces facet_advancement_review.
+  - id: governance_floor_regression
+    name: Governance maturity floor regression
+    description: "The agency's composite maturity floor has dropped a level since the previous assessment. Auto-surfaces facet_advancement_review."
+    meaning: "The composite agency floor dropped a governance-maturity level since the last assessment."
+    why_it_matters: "A falling floor is the strongest single signal of governance erosion."
+    owner: "Chief Program Officer"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    severity: warning
+    plain_thresholds: "warns when previous_floor > current_floor"
+    icon: arrow-down-circle
+    color: "#BA7517"
+
+# ─── Metrics ──────────────────────────────────────────────────────────────
+# Catalog facets per DESIGN-SPEC-semantic-catalog.md: meaning /
+# why_it_matters / owner / who_watches / tier / domain / plain_thresholds
+# so the de-IT-ified catalog leads with plain-language fields and the
+# snake_case id / unit / format / raw thresholds drop to a faint mono line.
+metrics:
+  - id: oversight_decisions_open
+    name: Open oversight decisions
+    description: "Strategic agency decisions currently in flight."
+    meaning: "Strategic agency decisions currently in flight."
+    why_it_matters: "A growing backlog of unresolved strategic decisions signals oversight strain."
+    owner: "Agency-head tier"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: count
+    format: "{value:.0f}"
+    direction: neutral
+    plain_thresholds: "warns at 12 · critical at 20"
+    thresholds: { warning_high: 12, critical_high: 20 }
+  - id: oversight_decisions_overdue
+    name: Overdue oversight decisions
+    description: "Oversight decisions past their SLA deadline (typically oversight-cycle close)."
+    meaning: "Strategic decisions past their oversight-cycle deadline."
+    why_it_matters: "Overdue strategic decisions are the first thing an IG asks about."
+    owner: "Agency-head tier"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: count
+    format: "{value:.0f}"
+    direction: lower_is_better
+    plain_thresholds: "warns at 1 · critical at 3"
+    thresholds: { warning_high: 1, critical_high: 3 }
+  - id: avg_evidence_per_oversight_decision
+    name: Average evidence per oversight decision
+    description: "Mean count of operational determinations and alerts linked as evidence per resolved oversight decision (90d)."
+    meaning: "How broadly each strategic decision draws on evidence before it is finalized."
+    why_it_matters: "Thin evidence behind a strategic decision is an audit-defensibility risk."
+    owner: "Agency-head tier"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: count
+    format: "{value:.1f}"
+    direction: higher_is_better
+    plain_thresholds: "warns below 2.0 · target 3.0"
+    thresholds: { warning_low: 2, target: 3 }
+  - id: cross_program_evidence_diversity
+    name: Cross-program evidence diversity
+    description: "Average number of distinct programs cited per oversight decision — proxy for how broadly each decision draws on evidence."
+    meaning: "Distinct programs cited per oversight decision."
+    why_it_matters: "Narrow sourcing means decisions may miss cross-program fraud patterns."
+    owner: "Agency-head tier"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: count
+    format: "{value:.1f}"
+    direction: higher_is_better
+    plain_thresholds: "warns below 1.5 · target 2.5"
+    thresholds: { warning_low: 1.5, target: 2.5 }
+  - id: committee_endorsement_lag
+    name: Committee endorsement lag
+    description: "Median days between executive decision and audit-committee noting / endorsement."
+    meaning: "Days between an executive decision and audit-committee endorsement."
+    why_it_matters: "Long lags weaken the contemporaneous-record standard."
+    owner: "Audit committee chair"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: days
+    format: "{value:.0f}"
+    direction: lower_is_better
+    plain_thresholds: "warns at 60 · critical at 90"
+    thresholds: { warning_high: 60, critical_high: 90 }
+  - id: oversight_outcome_capture_rate
+    name: Oversight outcome capture rate
+    description: "Percentage of oversight decisions decided 90+ days ago with outcome captured."
+    meaning: "Share of oversight decisions with outcomes captured 90+ days on."
+    why_it_matters: "Without captured outcomes, override quality can't be measured."
+    owner: "Agency-head tier"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: percent
+    format: "{value:.0f}%"
+    direction: higher_is_better
+    plain_thresholds: "warns below 70% · target 85%"
+    thresholds: { warning_low: 70, target: 85 }
+  # Federal-specific metrics
+  - id: oig_finding_response_lag
+    name: OIG finding response lag
+    description: "Median days between an OIG finding surfacing and the agency's oversight-level response decision being finalized."
+    meaning: "Days from an OIG finding surfacing to the agency's oversight-level response."
+    why_it_matters: "Slow responses to findings escalate oversight scrutiny."
+    owner: "OIG liaison"
+    who_watches: oig
+    tier: federal
+    domain: oversight_response
+    unit: days
+    format: "{value:.0f}"
+    direction: lower_is_better
+    plain_thresholds: "warns at 45 · critical at 90"
+    thresholds: { warning_high: 45, critical_high: 90 }
+  - id: improper_payment_target_attainment
+    name: Improper-payment target attainment
+    description: "Percentage of programs meeting the agency's annual improper-payment reduction target."
+    meaning: "Share of programs meeting the annual improper-payment reduction target."
+    why_it_matters: "This is the headline number GAO and Congress track."
+    owner: "Agency-head tier"
+    who_watches: agency_head
+    tier: cross_tier
+    domain: payment_integrity
+    unit: percent
+    format: "{value:.0f}%"
+    direction: higher_is_better
+    plain_thresholds: "warns below 75% · target 90%"
+    thresholds: { warning_low: 75, target: 90 }
+  # Governance program metrics — kept from the roadmap carry-forward.
+  - id: governance_initiatives_open
+    name: Open governance initiatives
+    description: "Oversight-tier governance initiatives currently in flight (planned + in_progress)."
+    meaning: "Active governance facet-advancement programs."
+    why_it_matters: "Too many in flight signals scope creep; zero signals stagnation."
+    owner: "Chief Program Officer"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: count
+    format: "{value:,.0f}"
+    direction: neutral
+    plain_thresholds: "warns at 8 · critical at 15"
+    thresholds: { warning_high: 8, critical_high: 15 }
+  - id: governance_floor_level
+    name: Agency governance floor
+    description: "Composite maturity floor — the lowest level achieved by every governance-maturity facet."
+    meaning: "The lowest level across every governance-maturity facet — the institutional floor."
+    why_it_matters: "Auditors anchor on the floor, not the ceiling. Raising it is what improves posture."
+    owner: "Agency head"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: level
+    format: "L{value:.0f}"
+    direction: higher_is_better
+    plain_thresholds: "target L3 · stretch L4"
+    thresholds: { target: 3, stretch: 4 }
+  - id: governance_floor_advances_per_year
+    name: Governance floor advances per year
+    description: "Number of agency floor advances in the trailing 12 months."
+    meaning: "Rate of agency floor advances per trailing 12 months."
+    why_it_matters: "Zero advances signals stagnation on the slowest-moving facet."
+    owner: "Chief Program Officer"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    unit: count
+    format: "{value:,.0f}"
+    direction: higher_is_better
+    plain_thresholds: "warns at 0 · target 1+"
+    thresholds: { warning_low: 0, target: 1 }
+
+# ─── Segments ─────────────────────────────────────────────────────────────
+segments:
+  by_decision_domain:
+    - { id: appropriations_and_obligations,        name: Appropriations & obligations,        filter: "decision_domain = 'appropriations_and_obligations'",        decision_types: [appropriations_strategy, apportionment_adjustment] }
+    - { id: fraud_loss_tolerance,                  name: Fraud-loss tolerance,                filter: "decision_domain = 'fraud_loss_tolerance'",                  decision_types: [improper_payment_reduction_target, fraud_tolerance_limit_change] }
+    - { id: congressional_and_regulatory_posture,  name: Congressional & regulatory posture,  filter: "decision_domain = 'congressional_and_regulatory_posture'",  decision_types: [oig_finding_response, gao_report_response, congressional_inquiry_response] }
+    - { id: program_design,                        name: Program design,                      filter: "decision_domain = 'program_design'",                        decision_types: [program_rule_change] }
+    - { id: subrecipient_and_vendor_oversight,     name: Subrecipient & vendor oversight,     filter: "decision_domain = 'subrecipient_and_vendor_oversight'",     decision_types: [subrecipient_oversight_strategy, major_award_action] }
+  by_cycle_status:
+    - { id: planned,    name: Planned cycles,    filter: "oversight_cycle.status = 'planned'",    decision_types: [] }
+    - { id: active,     name: Active cycles,     filter: "oversight_cycle.status = 'active'",     decision_types: [] }
+    - { id: concluded,  name: Concluded cycles,  filter: "oversight_cycle.status = 'concluded'",  decision_types: [] }
+  # governance-maturity facets — kept from the governance roadmap. All three governance
+  # decision_types apply to every facet.
+  by_governance_facet:
+    - { id: ownership,            name: Ownership,            filter: "governance.facet_id = 'ownership'",            decision_types: [governance_program_authorization, facet_advancement_review, governance_program_scope_adjustment] }
+    - { id: timeliness,           name: Timeliness,           filter: "governance.facet_id = 'timeliness'",           decision_types: [governance_program_authorization, facet_advancement_review, governance_program_scope_adjustment] }
+    - { id: reconstructability,   name: Reconstructability,   filter: "governance.facet_id = 'reconstructability'",   decision_types: [governance_program_authorization, facet_advancement_review, governance_program_scope_adjustment] }
+    - { id: override_discipline,  name: Override discipline,  filter: "governance.facet_id = 'override-discipline'",  decision_types: [governance_program_authorization, facet_advancement_review, governance_program_scope_adjustment] }
+    - { id: authority,            name: Authority,            filter: "governance.facet_id = 'authority'",            decision_types: [governance_program_authorization, facet_advancement_review, governance_program_scope_adjustment] }
+    - { id: oversight_linkage,         name: Oversight linkage,         filter: "governance.facet_id = 'oversight-linkage'",         decision_types: [governance_program_authorization, facet_advancement_review, governance_program_scope_adjustment] }
+
+# ─── Charts ───────────────────────────────────────────────────────────────
+charts:
+  cycle_progress:           { id: cycle_progress,           name: Oversight cycle progress,         type: sankey,  description: "Flow from cycle decisions in flight through to endorsed.",                metrics: [oversight_decisions_open, oversight_decisions_overdue] }
+  domain_distribution:      { id: domain_distribution,      name: Decision distribution by domain,  type: bar,     description: "Oversight decisions per domain over the trailing 12 months.",                  metrics: [] }
+  evidence_density_trend:   { id: evidence_density_trend,   name: Evidence density over time,       type: line,    description: "Average evidence-link count per resolved oversight decision.",                 metrics: [avg_evidence_per_oversight_decision] }
+  outcome_capture_status:   { id: outcome_capture_status,   name: Outcome capture by domain,        type: bar,     description: "Of oversight decisions decided 90+ days ago, share with outcome captured.",    metrics: [oversight_outcome_capture_rate] }
+  oig_response_pace:        { id: oig_response_pace,        name: OIG finding response pace,        type: line,    description: "Median response lag against the agency's internal target for IG findings.", metrics: [oig_finding_response_lag] }
+
+# ─── Insight templates ────────────────────────────────────────────────────
+insight_templates:
+  - { id: under_evidenced_decision,    trigger: "avg_evidence_per_oversight_decision < 2",      headline: "Oversight decisions are under-evidenced",                detail: "Average evidence count per resolved oversight decision is {value} — below the 2.0 threshold suggesting under-grounded agency-level decisions.",   severity: warning }
+  - { id: stale_evidence_warning,      trigger: "oversight_decisions_open > 0",                 headline: "Open oversight decisions may rely on aging evidence",    detail: "Open oversight decisions count: {value}. Review whether linked operational evidence remains current.",                                              severity: informational }
+  - { id: endorsement_lag,             trigger: "committee_endorsement_lag > 60",          headline: "Audit-committee endorsement lag is elevated",       detail: "Median days from executive decision to audit-committee noting is {value} — exceeds the 60-day governance target.",                             severity: warning }
+  - { id: outcome_capture_lagging,     trigger: "oversight_outcome_capture_rate < 70",          headline: "Oversight outcome capture is below target",              detail: "{value}% of oversight decisions decided 90+ days ago have outcomes recorded — below the 70% governance target.",                                    severity: warning }
+  - { id: cycle_decisions_overdue,     trigger: "oversight_decisions_overdue > 0",              headline: "Oversight decisions are past oversight-cycle deadline",  detail: "{value} oversight decisions are past their cycle close. Cycle dossier may publish without them.",                                                   severity: critical }
+  - { id: oig_lag_elevated,            trigger: "oig_finding_response_lag > 45",           headline: "OIG finding response lag is elevated",              detail: "Median days from OIG finding to oversight-level response is {value} — exceeds the 45-day internal target.",                                         severity: warning }
+  - { id: governance_floor_advance,    trigger: "governance_floor_level > previous_value", headline: "Agency governance floor advanced",                  detail: "Floor advanced to L{value}. Audit-committee review packet auto-queued via facet_advancement_review.",                                          severity: positive }
+
+# ─── Decision types ────────────────────────────────────────────────────────
+# 12 types across 8 federal domains + 3 governance-program types.
+# All oversight decisions share oversight_evidence_eligible: false — oversight never cites oversight.
+decision_types:
+
+  # ── Appropriations & obligations ───────────────────────────────────────
+  - id: appropriations_strategy
+    domain: appropriations_and_obligations
+    name: Appropriations strategy
+    description: Agency-level posture for the upcoming fiscal year — obligation pacing, set-asides, contingency reserves.
+    domain: appropriations
+    time_horizon: strategic
+    icon: trending-up
+    priority: critical
+    sla_hours: 2160
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cfo
+    payload_schema:
+      type: object
+      required: [fiscal_year, action_type]
+      properties:
+        fiscal_year:       { type: integer }
+        action_type:       { type: string, enum: [obligation_pacing, contingency_reserve, set_aside, recission_response] }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve,             name: Approve strategy,            authority_required: cfo,           impact: critical }
+      - { id: defer_to_next_cycle, name: Defer to next oversight cycle, authority_required: agency_head, impact: high }
+
+  - id: apportionment_adjustment
+    domain: appropriations_and_obligations
+    name: Apportionment adjustment
+    description: Mid-cycle adjustment to apportioned funds in response to OMB guidance or anti-deficiency risk.
+    domain: appropriations
+    time_horizon: strategic
+    icon: layers
+    priority: high
+    sla_hours: 720
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cfo
+    payload_schema:
+      type: object
+      required: [adjustment_type, trigger]
+      properties:
+        adjustment_type:   { type: string, enum: [reprogram, reapportion, anti_deficiency_response] }
+        trigger:           { type: string, enum: [omb_guidance, congressional_directive, internal_finding, audit_finding] }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve adjustment, authority_required: cfo, impact: critical }
+
+  # ── Fraud-loss tolerance ──────────────────────────────────────────────
+  - id: improper_payment_reduction_target
+    domain: fraud_loss_tolerance
+    name: Improper-payment reduction target
+    description: Annual target for reducing improper payments at the program portfolio level (PIIA reporting).
+    domain: integrity
+    time_horizon: strategic
+    icon: target
+    priority: critical
+    sla_hours: 2160
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cpio
+    payload_schema:
+      type: object
+      required: [fiscal_year, target_reduction_bps]
+      properties:
+        fiscal_year:          { type: integer }
+        target_reduction_bps: { type: number,  description: "Basis-point reduction target vs. prior-year IP rate." }
+        scope_programs:       { type: array, items: { type: string } }
+        primary_rationale:    { type: string, maxLength: 1000 }
+        governance_path:      { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve target, authority_required: cpio, impact: critical }
+
+  - id: fraud_tolerance_limit_change
+    domain: fraud_loss_tolerance
+    name: Fraud-tolerance limit change
+    description: Adjustment to the agency's accepted fraud-loss tolerance for one or more archetypes.
+    domain: integrity
+    time_horizon: strategic
+    icon: shield-alert
+    priority: high
+    sla_hours: 1440
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cpio
+    payload_schema:
+      type: object
+      required: [archetype, limit_direction]
+      properties:
+        archetype:         { type: string, description: "Archetype id whose tolerance shifts." }
+        limit_direction:   { type: string, enum: [tighten, loosen] }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve limit change, authority_required: cpio, impact: critical }
+
+  # ── Congressional & regulatory posture ────────────────────────────────
+  - id: oig_finding_response
+    domain: congressional_and_regulatory_posture
+    name: OIG finding response
+    description: Agency response to an Inspector General finding — corrective action plan, remediation scope, timeline.
+    domain: oversight_response
+    time_horizon: strategic
+    icon: clipboard-check
+    priority: critical
+    sla_hours: 1440
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cco
+    payload_schema:
+      type: object
+      required: [finding_id, response_type]
+      properties:
+        finding_id:         { type: string, description: "OIG finding identifier." }
+        response_type:      { type: string, enum: [concur, partially_concur, non_concur] }
+        corrective_action:  { type: string, maxLength: 2000 }
+        target_close_date:  { type: string, format: date }
+        primary_rationale:  { type: string, maxLength: 1000 }
+        governance_path:    { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve,           name: Approve response,          authority_required: agency_head, impact: critical }
+      - { id: refer_to_counsel,  name: Refer to general counsel,  authority_required: gc,          impact: high }
+
+  - id: gao_report_response
+    domain: congressional_and_regulatory_posture
+    name: GAO report response
+    description: Agency response to a GAO report — recommendation alignment, implementation strategy.
+    domain: oversight_response
+    time_horizon: strategic
+    icon: file-text
+    priority: high
+    sla_hours: 2160
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cco
+    payload_schema:
+      type: object
+      required: [report_id, recommendation_count, response_type]
+      properties:
+        report_id:            { type: string, description: "GAO report identifier (e.g., GAO-26-001)." }
+        recommendation_count: { type: integer }
+        response_type:        { type: string, enum: [agree, partially_agree, disagree] }
+        primary_rationale:    { type: string, maxLength: 1000 }
+        governance_path:      { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve response, authority_required: agency_head, impact: critical }
+
+  - id: congressional_inquiry_response
+    domain: congressional_and_regulatory_posture
+    name: Congressional inquiry response
+    description: Response to a Congressional committee inquiry, hearing question for the record, or letter.
+    domain: oversight_response
+    time_horizon: strategic
+    icon: mail
+    priority: critical
+    sla_hours: 720
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: gc
+    payload_schema:
+      type: object
+      required: [committee, inquiry_type]
+      properties:
+        committee:         { type: string, description: "Originating committee (e.g., 'House E&C', 'Senate HSGAC')." }
+        inquiry_type:      { type: string, enum: [letter, qfr, hearing_prep, briefing_request] }
+        due_date:          { type: string, format: date }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve response, authority_required: agency_head, impact: critical }
+
+  # ── Program design ────────────────────────────────────────────────────
+  - id: program_rule_change
+    domain: program_design
+    name: Program rule change
+    description: Significant change to program rules, eligibility framing, or delivery channels — above policy threshold.
+    domain: program_design
+    time_horizon: strategic
+    icon: edit-3
+    priority: critical
+    sla_hours: 2160
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: agency_head
+    payload_schema:
+      type: object
+      required: [program_id, change_type]
+      properties:
+        program_id:        { type: string, description: "Program id (matches programs/<id>.yaml)." }
+        change_type:       { type: string, enum: [eligibility_rule, benefit_amount, delivery_channel, recertification_cadence] }
+        regulatory_path:   { type: string, enum: [interim_final, notice_and_comment, sub_regulatory_guidance] }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve,    name: Approve rule change,  authority_required: agency_head, impact: critical }
+      - { id: send_back,  name: Send back for redraft, authority_required: cco,        impact: high }
+
+  # ── Subrecipient & vendor oversight ───────────────────────────────────
+  - id: subrecipient_oversight_strategy
+    domain: subrecipient_and_vendor_oversight
+    name: Subrecipient oversight strategy
+    description: Agency-level oversight posture for pass-through subrecipients — risk-based monitoring tier, single-audit follow-up cadence.
+    domain: subrecipient_oversight
+    time_horizon: strategic
+    icon: users
+    priority: high
+    sla_hours: 2160
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cpio
+    payload_schema:
+      type: object
+      required: [scope]
+      properties:
+        scope:             { type: string, enum: [single_program, agency_wide] }
+        risk_tier_changes: { type: array, items: { type: object } }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve strategy, authority_required: cpio, impact: high }
+
+  - id: major_award_action
+    domain: subrecipient_and_vendor_oversight
+    name: Major award action
+    description: Agency-level action on a major award (suspension, debarment posture decision, large recovery) above policy threshold.
+    domain: subrecipient_oversight
+    time_horizon: strategic
+    icon: alert-triangle
+    priority: critical
+    sla_hours: 1440
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cpio
+    payload_schema:
+      type: object
+      required: [recipient, action_type, amount_at_stake_usd]
+      properties:
+        recipient:           { type: string }
+        action_type:         { type: string, enum: [suspension, debarment, recovery, single_audit_response] }
+        amount_at_stake_usd: { type: number }
+        primary_rationale:   { type: string, maxLength: 1000 }
+        governance_path:     { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve,           name: Approve action,                 authority_required: cpio, impact: critical }
+      - { id: refer_to_counsel,  name: Refer to general counsel,       authority_required: gc,   impact: high }
+
+  # ── Governance & organization ─────────────────────────────────────────
+  - id: governance_structure_change
+    domain: governance_and_organization
+    name: Governance structure change
+    description: Material change to the agency's governance structure — committee creation, delegation policy, executive succession.
+    domain: governance
+    time_horizon: strategic
+    icon: users
+    priority: high
+    sla_hours: 2160
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: agency_head
+    payload_schema:
+      type: object
+      required: [change_type]
+      properties:
+        change_type:       { type: string, enum: [committee_charter, delegation_policy, succession_plan, oversight_charter] }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve change, authority_required: agency_head, impact: critical }
+
+  # ── Governance improvement (maturity-model-style) ───────────────────────────────
+  - id: governance_program_authorization
+    domain: governance_improvement
+    name: Governance program authorization
+    description: Authorize a new governance facet-advancement program (ownership, timeliness, reconstructability, override-discipline, authority, oversight-linkage).
+    domain: governance
+    time_horizon: strategic
+    icon: check-circle
+    priority: high
+    sla_hours: 2160
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cpio
+    payload_schema:
+      type: object
+      required: [facet, target_level]
+      properties:
+        facet:         { type: string, enum: [ownership, timeliness, reconstructability, override-discipline, authority, oversight-linkage] }
+        target_level:  { type: integer, minimum: 1, maximum: 5 }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve program, authority_required: cpio, impact: high }
+
+  - id: facet_advancement_review
+    domain: governance_improvement
+    name: Facet advancement review
+    description: Oversight review when a facet advances or regresses (auto-surfaced on floor change).
+    domain: governance
+    time_horizon: strategic
+    icon: arrow-up-circle
+    priority: medium
+    sla_hours: 720
+    oversight_evidence_eligible: false
+    manually_creatable: false   # auto-surfaced by the floor evaluator
+    authoring_authority_level: cpio
+    payload_schema:
+      type: object
+      required: [facet, direction]
+      properties:
+        facet:             { type: string, enum: [ownership, timeliness, reconstructability, override-discipline, authority, oversight-linkage] }
+        direction:         { type: string, enum: [advance, regress] }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: note, name: Note advancement / regression, authority_required: cpio, impact: medium }
+
+  - id: governance_program_scope_adjustment
+    domain: governance_improvement
+    name: Governance program scope adjustment
+    description: Adjust scope, target, or timeline of an in-flight governance facet-advancement program.
+    domain: governance
+    time_horizon: strategic
+    icon: sliders
+    priority: medium
+    sla_hours: 1440
+    oversight_evidence_eligible: false
+    manually_creatable: true
+    authoring_authority_level: cpio
+    payload_schema:
+      type: object
+      required: [facet, adjustment_type]
+      properties:
+        facet:             { type: string, enum: [ownership, timeliness, reconstructability, override-discipline, authority, oversight-linkage] }
+        adjustment_type:   { type: string, enum: [target_change, timeline_change, scope_narrowing, scope_widening] }
+        primary_rationale: { type: string, maxLength: 1000 }
+        governance_path:   { type: array, items: { type: object } }
+    available_actions:
+      - { id: approve, name: Approve adjustment, authority_required: cpio, impact: medium }
+
+# ─── Authority levels ──────────────────────────────────────────────────────
+authority_levels:
+  - { id: gc,                    name: General Counsel,                  level: 3, can_approve: [refer_to_counsel] }
+  - { id: cco,                   name: Chief Compliance Officer,         level: 4, can_approve: [approve] }
+  - { id: coo,                   name: Chief Operating Officer,          level: 4, can_approve: [approve] }
+  - { id: cpio,                  name: Chief Program Officer,  level: 4, can_approve: [approve] }
+  - { id: cfo,                   name: Chief Financial Officer,          level: 4, can_approve: [approve, defer_to_next_cycle] }
+  - { id: agency_head,           name: Agency head,                      level: 5, can_approve: [approve, defer_to_next_cycle, send_back] }
+  - { id: audit_committee_chair, name: Audit committee chair,            level: 6, can_approve: [note, approve] }
+  - { id: inspector_general,     name: Inspector General,                level: 7, can_approve: [note] }
+
+# ─── Personas ──────────────────────────────────────────────────────────────
+# Internal agency actors + IG (statutorily independent but co-located) +
+# the audit-committee chair (internal committee, parallels the legacy
+# committee_chair / audit_committee_chair role in the corporate framing).
+personas:
+  - id: agency_head
+    name: Agency head
+    description: "Secretary / Administrator / Director. Owns appropriations, program portfolio, program design, and governance & organization domains."
+    meaning: "The Secretary / Administrator / Director — the agency's apex decision owner."
+    why_it_matters: "The default owner of the agency's strategic decisions and the personal target of GAO and Congressional escalation."
+    owner: "Agency head"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    icon: user-circle
+    default_authority_level: agency_head
+    role: executive
+    cognitive_budget: medium
+    can_link_evidence: true
+    can_approve_oversight_decisions: true
+    can_be_decision_owner: true
+  - id: cfo
+    name: Chief Financial Officer
+    description: "Federal CFO. Owns appropriations & obligations; reviews program portfolio, program design."
+    meaning: "Federal CFO — the appropriations & obligations owner."
+    why_it_matters: "Anti-deficiency, apportionment, and OMB reporting all run through this seat."
+    owner: "Agency head"
+    who_watches: agency_head
+    tier: federal
+    domain: appropriations
+    icon: trending-up
+    default_authority_level: cfo
+    role: executive
+    cognitive_budget: medium
+    can_link_evidence: true
+    can_approve_oversight_decisions: true
+    can_be_decision_owner: true
+  - id: cpio
+    name: Chief Program Officer
+    description: "Owns fraud-loss tolerance, subrecipient & vendor oversight, and the governance program; reviews program design."
+    meaning: "Owns fraud-loss tolerance, subrecipient & vendor oversight, and the governance program."
+    why_it_matters: "The seat the IG works with most; the agency's program-integrity center of gravity."
+    owner: "Agency head"
+    who_watches: agency_head
+    tier: federal
+    domain: integrity
+    icon: shield
+    default_authority_level: cpio
+    role: executive
+    cognitive_budget: high
+    can_link_evidence: true
+    can_approve_oversight_decisions: true
+    can_be_decision_owner: true
+  - id: cco
+    name: Chief Compliance Officer
+    description: "Owns congressional & regulatory posture; coordinates with GC on responses to GAO / OIG / Congress."
+    meaning: "Owns the agency's posture on Congressional and regulatory oversight."
+    why_it_matters: "Coordinates the responses GAO / OIG / OMB / Congress will read."
+    owner: "Agency head"
+    who_watches: agency_head
+    tier: federal
+    domain: oversight_response
+    icon: scale
+    default_authority_level: cco
+    role: executive
+    cognitive_budget: high
+    can_link_evidence: true
+    can_approve_oversight_decisions: true
+    can_be_decision_owner: true
+  - id: coo
+    name: Chief Operating Officer
+    description: "Owns technology & systems; reviews program portfolio and subrecipient oversight."
+    meaning: "Owns technology & systems."
+    why_it_matters: "Major IT investments and identity-resolution infrastructure flow through this seat."
+    owner: "Agency head"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    icon: layers
+    default_authority_level: coo
+    role: executive
+    cognitive_budget: medium
+    can_link_evidence: true
+    can_approve_oversight_decisions: true
+    can_be_decision_owner: true
+  - id: gc
+    name: General Counsel
+    description: "Advises on regulatory and oversight responses; owns referrals; reviews but does not own."
+    meaning: "Advises on regulatory and oversight responses; owns referrals."
+    why_it_matters: "Privileged-communication boundary; closes the legal posture on every response."
+    owner: "General Counsel"
+    who_watches: agency_head
+    tier: federal
+    domain: oversight_response
+    icon: gavel
+    default_authority_level: gc
+    role: executive
+    cognitive_budget: high
+    can_link_evidence: true
+    can_approve_oversight_decisions: false
+    can_be_decision_owner: false
+  - id: inspector_general
+    name: Inspector General
+    description: "Statutorily independent. Notes oversight responses to IG findings; cannot own agency oversight decisions."
+    meaning: "Statutorily independent. Endorses but does not own agency oversight decisions."
+    why_it_matters: "Independence is statutory; the seat the audit-trail must be most defensible for."
+    owner: "Inspector General"
+    who_watches: oig
+    tier: federal
+    domain: oversight_response
+    icon: eye
+    default_authority_level: inspector_general
+    role: oversight
+    cognitive_budget: low
+    can_link_evidence: false
+    can_approve_oversight_decisions: false
+    can_be_decision_owner: false
+    can_record_committee_action: true
+  - id: audit_committee_chair
+    name: Audit committee chair
+    description: "Internal audit committee chair. Endorses oversight decisions across appropriations, governance, and oversight-response domains."
+    meaning: "Internal audit committee chair — endorses oversight decisions across domains."
+    why_it_matters: "Endorsement carries the agency's contemporaneous-record standard forward."
+    owner: "Agency head"
+    who_watches: agency_head
+    tier: federal
+    domain: governance
+    icon: clipboard-check
+    default_authority_level: audit_committee_chair
+    role: internal_committee
+    cognitive_budget: low
+    can_link_evidence: false
+    can_approve_oversight_decisions: true
+    can_be_decision_owner: false
+    can_record_committee_action: true
+  - id: oversight_liaison
+    name: Oversight liaison
+    description: "Federal-internal point of contact for GAO / OMB / Congressional staff. Coordinates but does not own oversight decisions."
+    meaning: "Federal-internal point of contact for GAO / OMB / Congressional staff."
+    why_it_matters: "Closes the loop on external-oversight communications without owning the decision."
+    owner: "Oversight liaison"
+    who_watches: oig
+    tier: federal
+    domain: oversight_response
+    icon: link
+    default_authority_level: gc
+    role: staff
+    cognitive_budget: medium
+    can_link_evidence: true
+    can_approve_oversight_decisions: false
+    can_be_decision_owner: false
+
+# ─── Overridable keys ─────────────────────────────────────────────────────
+overridable_keys:
+  sla.default_response_hours:        int
+  sla.cycle_aware:                   bool
+  sla.warning_window_hours:          int
+  sla.critical_window_hours:         int
+  ownership.escalation_role:         str
+  evidence_staleness_threshold_days: int
+  cycle_warning_window_days:         int
+  outcome_capture_window_days:       int
+
+# ─── SLA (cycle-aware) ────────────────────────────────────────────────────
+sla:
+  default_response_hours: 2160       # 90 days when not tied to an oversight cycle
+  cycle_aware: true                  # oversight-only — SLA defaults to cycle.cycle_end when tied to a cycle
+  warning_window_hours: 168          # 7 days
+  critical_window_hours: 72          # 3 days
+  business_hours_start: "08:00"
+  business_hours_end: "17:00"
+  timezone: "America/New_York"
+  holidays: []
+
+# ─── Ownership ────────────────────────────────────────────────────────────
+ownership:
+  primary_role:    agency_head       # decision-domain primary owner takes precedence at runtime
+  backup_role:     cfo
+  escalation_role: cco
