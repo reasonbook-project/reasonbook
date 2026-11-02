@@ -65,6 +65,26 @@ Re-runs are a no-op (no new password is printed). You can also run it manually:
 docker compose exec reasonbook python -m scripts.bootstrap_admin
 ```
 
+### Create the admin in a running container (no redeploy)
+
+If the app is already running without `REASONBOOK_ADMIN_EMAIL` set — so no admin
+exists and you can't log in — open a shell in the running container (e.g. your
+platform's **Console**, or `docker compose exec reasonbook sh`) and run the
+bootstrap with the email inline:
+
+```bash
+REASONBOOK_ADMIN_EMAIL=you@example.org python -m scripts.bootstrap_admin
+```
+
+It creates the admin in the live database and prints the generated password
+once. **Log in with that email as the username.** This avoids a redeploy; it
+writes to whatever database the running instance is using.
+
+> On a platform with an ephemeral filesystem using the default SQLite (see §4),
+> an admin created this way is wiped on the next redeploy/restart. Set
+> `REASONBOOK_ADMIN_EMAIL` as a persistent env var (so it's recreated each
+> deploy), and use PostgreSQL if you need the account and data to persist.
+
 ---
 
 ## 4. Database
