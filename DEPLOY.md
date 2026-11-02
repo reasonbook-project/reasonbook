@@ -80,6 +80,16 @@ SQLite serializes writers with a single database-level write lock, so only one
 write transaction commits at a time. This is **not** suitable for high
 write-concurrency or multi-node deployments — use PostgreSQL for those.
 
+> **Persistence on ephemeral-filesystem platforms (PaaS / serverless containers).**
+> Many managed container platforms give the app an **ephemeral filesystem** that
+> is wiped on every redeploy, restart, or scale event. The SQLite file lives on
+> that filesystem, so **your data will not survive a redeploy there.** On such a
+> platform, either (a) attach a **persistent volume mounted at `/data`**, or
+> (b) use **PostgreSQL** (§4.2) by setting `REASONBOOK_DATABASE_URL` — a managed
+> Postgres instance is the simplest option. A long-lived host or VM with a mounted
+> volume (e.g. `docker compose up` on a server) keeps SQLite perfectly; it is only
+> the stateless/ephemeral-disk platforms that need a volume or PostgreSQL.
+
 ### 4.2 PostgreSQL (optional)
 
 Start the bundled PostgreSQL service with the `postgres` profile, then point the
